@@ -1,62 +1,245 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Notifications</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="description" content="Truely — Your notifications"/>
+<title>Truely — Notifications</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="shared-css"></style>
+<style>
+.notif-header {
+  position: sticky;
+  top: 53px;
+  z-index: 80;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.notif-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--serif);
+}
+.notif-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+  animation: fadeUp 0.2s ease;
+}
+.notif-item:hover { background: var(--hover); }
+.notif-item.unread {
+  background: rgba(29,155,240,0.05);
+  border-left: 3px solid var(--blue);
+}
+.notif-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.notif-icon.like { background: rgba(244,33,46,0.1); color: var(--red); }
+.notif-icon.comment { background: rgba(29,155,240,0.1); color: var(--blue); }
+.notif-icon.follow { background: rgba(0,186,124,0.1); color: var(--green); }
+.notif-icon.repost { background: rgba(0,186,124,0.1); color: var(--green); }
+.notif-icon svg { width: 22px; height: 22px; }
+.notif-content {
+  flex: 1;
+  min-width: 0;
+}
+.notif-text {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.notif-text strong { font-weight: 700; }
+.notif-time {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+.mark-all-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mark-all-btn:hover {
+  background: var(--hover);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.empty-notif {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text3);
+}
+.empty-notif svg {
+  width: 64px;
+  height: 64px;
+  stroke: var(--text3);
+  stroke-width: 1.5;
+  margin-bottom: 16px;
+}
+</style>
+</head>
 <body>
-<div id="_nav" data-page="notifs"></div>
-<div class="page-root"><div class="center-wrap" style="border-left:1px solid var(--border);border-right:1px solid var(--border)">
-<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)">
-  <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px">Notifications</span>
-  <button class="btn-ghost btn-sm" onclick="markAll()">Mark all read</button>
+<div id="nav-ph"></div>
+<div id="bn-ph"></div>
+
+<div class="page-wrap">
+  <div class="main-wrap">
+    <div class="notif-header">
+      <h1>Notifications</h1>
+      <button class="mark-all-btn" onclick="markAllRead()">Mark all read</button>
+    </div>
+    <div id="notifications-list">
+      <div style="padding: 32px; text-align: center;"><div class="skeleton" style="height: 70px; margin-bottom: 8px;"></div><div class="skeleton" style="height: 70px;"></div></div>
+    </div>
+  </div>
 </div>
-<div id="notifs-list"></div>
-</div></div>
-<div class="toast" id="_toast"></div>
-<script src="/truely.js"></script>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/supabase.js"></script>
 <script>
-document.getElementById('_css').textContent=CSS;
+document.getElementById('shared-css').textContent = SHARED_CSS;
+document.getElementById('nav-ph').innerHTML = getNavHTML('notifications');
+document.getElementById('bn-ph').innerHTML = getBottomNavHTML('notifications');
 
-async function loadNotifs(){
-  const user=T.state.user,list=document.getElementById('notifs-list');
-  if(!user){list.innerHTML='<div class="empty">Sign in to see notifications</div>';return;}
-  list.innerHTML=`<div style="padding:32px;text-align:center"><div class="spinner"></div></div>`;
-  const{data:notifs}=await sb.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(50);
-  if(!notifs||!notifs.length){list.innerHTML='<div class="empty"><div class="empty-icon">🔔</div><p>No notifications yet</p></div>';return;}
-  const ids=[...new Set(notifs.map(n=>n.from_user_id).filter(Boolean))];
-  const pm={};
-  if(ids.length){const{data:profs}=await sb.from('profiles').select('*').in('id',ids);(profs||[]).forEach(p=>pm[p.id]=p);}
-  list.innerHTML=notifs.map(n=>{
-    const from=pm[n.from_user_id],name=from?.full_name||'Someone',av=from?.avatar_url;
-    const ring=Prof.ring(from),badge=Prof.badge(from);
-    let icon='',iconCls='',text='';
-    if(n.type==='like'){icon='❤️';iconCls='ni-like';text='liked your post';}
-    else if(n.type==='comment'){icon='💬';iconCls='ni-cmt';text='replied to your post';}
-    else if(n.type==='follow'){icon='👤';iconCls='ni-follow';text='started following you';}
-    else if(n.type==='repost'){icon='🔁';iconCls='ni-rep';text='reposted your post';}
-    else{icon='📢';iconCls='ni-cmt';text=n.message||'sent you a notification';}
-    const href=n.post_id?`/post.html?id=${n.post_id}`:`/profile.html?id=${n.from_user_id}`;
-    return `<div class="notif${n.is_read?'':' unread'}" id="n-${n.id}" onclick="location.href='${href}';markOne(${n.id})">
-      <div class="notif-icon ${iconCls}">${icon}</div>
-      <div style="display:flex;align-items:center;gap:8px;flex:1">
-        <div class="av av-sm${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
-        <div class="notif-text"><b>${esc(name)}</b>${badge} ${text}<div class="notif-time">${ago(n.created_at)}</div></div>
+async function loadNotifications() {
+  const user = window.TruelyState.currentUser;
+  const container = document.getElementById('notifications-list');
+
+  if (!user) {
+    container.innerHTML = `
+      <div class="empty-notif">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <p>Sign in to see notifications</p>
       </div>
-    </div>`;
+    `;
+    return;
+  }
+
+  const { data: notifications } = await sb
+    .from('notifications')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (!notifications || notifications.length === 0) {
+    container.innerHTML = `
+      <div class="empty-notif">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <p>No notifications yet</p>
+        <small>When someone likes, comments, or follows you, it will appear here</small>
+      </div>
+    `;
+    return;
+  }
+
+  // Get from user profiles
+  const fromUserIds = [...new Set(notifications.map(n => n.from_user_id).filter(Boolean))];
+  const { data: profiles } = await sb.from('profiles').select('*').in('id', fromUserIds);
+  const profileMap = {};
+  (profiles || []).forEach(p => profileMap[p.id] = p);
+
+  container.innerHTML = notifications.map(notif => {
+    const fromUser = profileMap[notif.from_user_id];
+    if (!fromUser) return '';
+    const isAdmin = fromUser.is_admin || fromUser.email === ADMIN_EMAIL;
+    const isVerified = fromUser.is_verified;
+    const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+    let badgeHtml = '';
+    if (isAdmin) badgeHtml = adminBadge(14);
+    else if (isVerified) badgeHtml = verifiedBadge(14);
+    const avHTML = fromUser.avatar_url ? `<img src="${fromUser.avatar_url}">` : `<span>${(fromUser.full_name || 'U')[0].toUpperCase()}</span>`;
+
+    let iconHtml = '';
+    let actionText = '';
+    let iconClass = '';
+    if (notif.type === 'like') {
+      iconHtml = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+      iconClass = 'like';
+      actionText = 'liked your post';
+    } else if (notif.type === 'comment') {
+      iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+      iconClass = 'comment';
+      actionText = 'commented on your post';
+    } else if (notif.type === 'follow') {
+      iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+      iconClass = 'follow';
+      actionText = 'started following you';
+    } else if (notif.type === 'repost') {
+      iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+      iconClass = 'repost';
+      actionText = 'reposted your post';
+    }
+
+    const href = notif.post_id ? `/post.html?id=${notif.post_id}` : `/profile.html?id=${notif.from_user_id}`;
+
+    return `
+      <div class="notif-item ${!notif.is_read ? 'unread' : ''}" onclick="handleNotifClick('${notif.id}', '${href}')">
+        <div class="notif-icon ${iconClass}">${iconHtml}</div>
+        <div class="avatar av-sm ${ring}">${avHTML}</div>
+        <div class="notif-content">
+          <div class="notif-text">
+            <strong>${escapeHtml(fromUser.full_name || 'Someone')}</strong>${badgeHtml} ${actionText}
+          </div>
+          <div class="notif-time">${timeAgo(notif.created_at)}</div>
+        </div>
+      </div>
+    `;
   }).join('');
-  await sb.from('notifications').update({is_read:true}).eq('user_id',user.id).eq('is_read',false);
-  document.querySelectorAll('[id^="ndot"]').forEach(el=>el.style.display='none');
+
+  // Mark all as read
+  await sb.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+  updateNotifDot();
 }
 
-async function markOne(id){await sb.from('notifications').update({is_read:true}).eq('id',id);document.getElementById(`n-${id}`)?.classList.remove('unread');}
-async function markAll(){
-  const user=T.state.user;if(!user)return;
-  await sb.from('notifications').update({is_read:true}).eq('user_id',user.id);
-  document.querySelectorAll('.notif.unread').forEach(el=>el.classList.remove('unread'));
-  toast('All marked as read');
+async function handleNotifClick(notifId, href) {
+  await sb.from('notifications').update({ is_read: true }).eq('id', notifId);
+  window.location.href = href;
 }
 
-Auth.init(()=>loadNotifs());
-setTimeout(()=>{if(!T.state.user)loadNotifs();},400);
+async function markAllRead() {
+  const user = window.TruelyState.currentUser;
+  if (!user) return;
+  await sb.from('notifications').update({ is_read: true }).eq('user_id', user.id);
+  document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+  toast('All marked as read', 'success');
+}
+
+function updateNotifDot() {
+  const dot = document.getElementById('notif-dot');
+  const bnDot = document.getElementById('bn-notif-dot');
+  if (dot) dot.style.display = 'none';
+  if (bnDot) bnDot.style.display = 'none';
+}
+
+// Initial load
+initSharedAuth(async () => {
+  await loadNotifications();
+});
+setTimeout(() => {
+  if (!window.TruelyState.currentUser) loadNotifications();
+}, 400);
 </script>
 </body>
 </html>
