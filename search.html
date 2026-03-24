@@ -1,46 +1,118 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Truely - Search">
-  <title>Truely — Search</title>
-  <link rel="stylesheet" href="/css/style.css">
-</head>
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Search</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
 <body>
-  <div id="nav-placeholder"></div>
-  
-  <main class="page-wrap">
-    <div class="container">
-      <div class="search-header">
-        <div class="search-wrapper">
-          <span class="search-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18">
-              <circle cx="11" cy="11" r="8"/>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-          </span>
-          <input type="text" id="search-input" class="search-input" placeholder="Search people or posts..." autofocus>
+<div id="_nav" data-page="search"></div>
+<div class="page-root"><div class="center-wrap" style="border-left:1px solid var(--border);border-right:1px solid var(--border)">
+<div class="search-bar-wrap">
+  <div class="search-bar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="sq" placeholder="Search Truely..." oninput="onSearch()" autofocus/>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab on" id="tp" onclick="switchTab('people')">People</div>
+  <div class="tab" id="tt" onclick="switchTab('posts')">Posts</div>
+</div>
+<div id="results"><div class="empty"><div class="empty-icon" style="font-size:32px">🔍</div><p>Search for people or posts</p></div></div>
+</div></div>
+<div class="toast" id="_toast"></div>
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent=CSS;
+let sTab='people',sTimer=null;
+
+// Pre-fill from URL param
+const qParam=new URLSearchParams(location.search).get('q');
+if(qParam){document.getElementById('sq').value=qParam;}
+
+function switchTab(t){
+  sTab=t;
+  document.getElementById('tp').className='tab'+(t==='people'?' on':'');
+  document.getElementById('tt').className='tab'+(t==='posts'?' on':'');
+  doSearch();
+}
+function onSearch(){clearTimeout(sTimer);sTimer=setTimeout(doSearch,280);}
+
+async function doSearch(){
+  const q=document.getElementById('sq').value.trim();
+  const res=document.getElementById('results');
+  if(!q){res.innerHTML='<div class="empty"><div class="empty-icon" style="font-size:32px">🔍</div><p>Search for people or posts</p></div>';return;}
+  res.innerHTML=`<div style="padding:32px;text-align:center"><div class="spinner"></div></div>`;
+  if(sTab==='people')await searchPeople(q);
+  else await searchPosts(q);
+}
+
+async function searchPeople(q){
+  const{data:profs}=await sb.from('profiles').select('*').ilike('full_name',`%${q}%`).limit(20);
+  const res=document.getElementById('results');
+  if(!profs||!profs.length){res.innerHTML='<div class="empty">No people found</div>';return;}
+  const user=T.state.user;
+  let followed=new Set();
+  if(user){const{data:fl}=await sb.from('follows').select('following_id').eq('follower_id',user.id);(fl||[]).forEach(f=>followed.add(f.following_id));}
+  res.innerHTML=profs.map(p=>{
+    const name=p.full_name||'User',av=p.avatar_url;
+    const ring=Prof.ring(p),badge=Prof.badge(p);
+    const isFollowing=followed.has(p.id),isMe=user?.id===p.id;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="location.href='/profile.html?id=${p.id}'" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">
+      <div class="av av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:3px">${esc(name)}${badge}</div>
+        <div style="font-size:12px;color:var(--sub)">${fmt(p.follower_count||0)} followers${p.bio?` · ${esc(p.bio.slice(0,40))}`:''}</div>
+      </div>
+      ${user&&!isMe?`<button class="follow-pill${isFollowing?' on':''}" id="sfp-${p.id}" onclick="event.stopPropagation();srFollow('${p.id}',${isFollowing})">${isFollowing?'Following':'Follow'}</button>`:''}
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2" width="16"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>`;
+  }).join('');
+}
+
+async function searchPosts(q){
+  const isHash=q.startsWith('#');
+  const res=document.getElementById('results');
+  let posts;
+  if(isHash){
+    const tag=q.slice(1).toLowerCase();
+    const{data:ht}=await sb.from('hashtags').select('post_id').eq('tag',tag).limit(20);
+    if(!ht||!ht.length){res.innerHTML='<div class="empty">No posts with that hashtag</div>';return;}
+    const ids=ht.map(h=>h.post_id);
+    const{data}=await sb.from('posts').select('*').in('id',ids).order('created_at',{ascending:false});
+    posts=data;
+  } else {
+    const{data}=await sb.from('posts').select('*').ilike('content',`%${q}%`).order('created_at',{ascending:false}).limit(20);
+    posts=data;
+  }
+  if(!posts||!posts.length){res.innerHTML='<div class="empty">No posts found</div>';return;}
+  const ids=[...new Set(posts.map(p=>p.author_id))];
+  const{data:profs}=await sb.from('profiles').select('*').in('id',ids);
+  const pm={};(profs||[]).forEach(p=>pm[p.id]=p);
+  res.innerHTML=posts.map((p,i)=>{
+    const prof=pm[p.author_id],name=prof?.full_name||'User',av=prof?.avatar_url;
+    const ring=Prof.ring(prof),badge=Prof.badge(prof);
+    const hi=esc(p.content||'').replace(new RegExp(esc(q),'gi'),m=>`<span style="background:rgba(79,70,229,.2);color:var(--ind);border-radius:3px;padding:0 2px">${m}</span>`);
+    return `<div class="post" style="animation-delay:${i*30}ms" onclick="location.href='/post.html?id=${p.id}'">
+      <div class="post-row">
+        <div class="av av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
+        <div class="post-body">
+          <div class="post-meta"><span class="post-name" onclick="event.stopPropagation();location.href='/profile.html?id=${p.author_id}'">${esc(name)}</span>${badge}<span class="post-dot">·</span><span class="post-time">${ago(p.created_at)}</span></div>
+          <div class="post-text">${hi}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--sub);margin-top:6px">${fmt(p.like_count||0)} likes · ${fmt(p.comment_count||0)} replies</div>
         </div>
       </div>
-      
-      <div class="search-tabs">
-        <button class="search-tab active" data-tab="people">People</button>
-        <button class="search-tab" data-tab="posts">Posts</button>
-      </div>
-      
-      <div id="search-results"></div>
-    </div>
-  </main>
-  
-  <div id="toast-container" class="toast-container"></div>
+    </div>`;
+  }).join('');
+}
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/config.js"></script>
-  <script src="/js/utils.js"></script>
-  <script src="/js/state.js"></script>
-  <script src="/js/auth.js"></script>
-  <script src="/js/components.js"></script>
-  <script src="/js/search.js"></script>
+async function srFollow(id,following){
+  const user=T.state.user;if(!user){location.href='/landing.html';return;}
+  const btn=document.getElementById(`sfp-${id}`);
+  if(following){await sb.from('follows').delete().eq('follower_id',user.id).eq('following_id',id);btn.textContent='Follow';btn.className='follow-pill';}
+  else{await sb.from('follows').insert({follower_id:user.id,following_id:id});btn.textContent='Following';btn.className='follow-pill on';toast('Following!');}
+  btn.setAttribute('onclick',`event.stopPropagation();srFollow('${id}',${!following})`);
+}
+
+Auth.init(()=>{if(qParam)doSearch();});
+if(qParam)setTimeout(doSearch,500);
+</script>
 </body>
 </html>
