@@ -1,242 +1,30 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Truely — Profile</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style id="shared-css"></style>
-<style>
-.profile-header{background:var(--card);border-bottom:1px solid var(--border);padding:24px 16px;}
-.profile-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;}
-.profile-info{flex:1;}
-.profile-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.profile-handle{font-size:14px;color:var(--muted);margin-top:2px;}
-.profile-bio{font-size:15px;line-height:1.6;margin-top:10px;color:var(--text);}
-.profile-bio-edit{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;resize:none;outline:none;margin-top:10px;}
-.profile-bio-edit:focus{border-color:var(--indigo);}
-.profile-stats{display:flex;gap:24px;margin-top:14px;}
-.stat{cursor:pointer;}
-.stat-num{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;}
-.stat-label{font-size:13px;color:var(--muted);}
-.stat:hover .stat-num{color:var(--indigo);}
-.follow-btn{padding:9px 22px;border-radius:100px;font-weight:700;font-size:14px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
-.follow-btn.follow{background:var(--indigo);color:#fff;}
-.follow-btn.follow:hover{background:var(--indigo-light);transform:translateY(-1px);}
-.follow-btn.following{background:transparent;border:1px solid var(--border);color:var(--text);}
-.follow-btn.following:hover{border-color:var(--red);color:var(--red);}
-.msg-btn{padding:9px 22px;border-radius:100px;font-weight:700;font-size:14px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text);font-family:'DM Sans',sans-serif;transition:all 0.2s;margin-right:8px;}
-.msg-btn:hover{border-color:var(--cyan);color:var(--cyan);}
-.post-card{background:var(--card);border-bottom:1px solid var(--border);padding:16px;transition:background 0.15s;animation:fadeIn 0.3s ease;}
-.post-card:hover{background:var(--hover);}
-.post-top{display:flex;gap:12px;}
-.post-body{flex:1;}
-.post-time{font-size:13px;color:var(--muted);}
-.post-content{font-size:15px;line-height:1.65;margin-top:8px;color:var(--text);white-space:pre-wrap;word-break:break-word;}
-.post-actions{display:flex;align-items:center;gap:2px;margin-top:12px;}
-.act-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:100px;border:none;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--muted);transition:all 0.2s;}
-.act-btn:hover{background:var(--hover);}
-.act-btn.like.liked{color:var(--red);}
-.act-btn.like:hover{color:var(--red);background:rgba(239,68,68,0.08);}
-.act-btn svg{width:17px;height:17px;}
-.del-btn{margin-left:auto;padding:5px 10px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;}
-.del-btn:hover{color:var(--red);background:rgba(239,68,68,0.08);}
-.skel-post{padding:16px;border-bottom:1px solid var(--border);}
-.skel-row{display:flex;gap:12px;}
-.skel-av{width:44px;height:44px;border-radius:50%;flex-shrink:0;}
-.skel-lines{flex:1;}
-.skel-line{height:12px;margin-bottom:8px;border-radius:6px;}
-.empty-state{text-align:center;padding:48px 20px;color:var(--muted);}
-.edit-actions{display:flex;gap:8px;margin-top:10px;}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Truely - User Profile">
+  <title>Truely — Profile</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<div id="nav-placeholder"></div>
-<div class="page-wrap">
-  <div class="wrap">
-    <div class="profile-header" id="profile-header">
-      <div class="skel-row"><div class="skeleton skel-av" style="width:80px;height:80px"></div><div class="skel-lines" style="margin-top:8px"><div class="skeleton skel-line" style="width:40%"></div><div class="skeleton skel-line" style="width:60%"></div></div></div>
+  <div id="nav-placeholder"></div>
+  
+  <main class="page-wrap">
+    <div class="container">
+      <div id="profile-header"></div>
+      <div id="profile-posts"></div>
     </div>
-    <div id="profile-posts"></div>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
-<script src="/supabase.js"></script>
-<script>
-document.getElementById('shared-css').textContent = SHARED_CSS;
-document.getElementById('nav-placeholder').innerHTML = getNavHTML('');
+  </main>
+  
+  <div id="toast-container" class="toast-container"></div>
 
-const params = new URLSearchParams(window.location.search);
-const profileId = params.get('id');
-let profileData = null;
-let isOwnProfile = false;
-let isFollowing = false;
-let editingBio = false;
-
-async function loadProfile() {
-  if (!profileId) { window.location.href = '/'; return; }
-  const { data: profile } = await sb.from('profiles').select('*').eq('id', profileId).single();
-  if (!profile) { document.getElementById('profile-header').innerHTML = '<div class="empty-state"><p>User not found</p></div>'; return; }
-  profileData = profile;
-  const user = window.TruelyState.currentUser;
-  isOwnProfile = user?.id === profileId;
-
-  // Get follow counts
-  const { data: followers } = await sb.from('follows').select('id').eq('following_id', profileId);
-  const { data: following } = await sb.from('follows').select('id').eq('follower_id', profileId);
-
-  // Check if current user follows this profile
-  if (user && !isOwnProfile) {
-    const { data: followCheck } = await sb.from('follows').select('id').eq('follower_id', user.id).eq('following_id', profileId).single();
-    isFollowing = !!followCheck;
-  }
-
-  const isAdmin = profile.is_admin || profile.email === ADMIN_EMAIL;
-  const isVerified = profile.is_verified;
-  const ring = isAdmin ? ' admin-ring' : isVerified ? ' verified-ring' : '';
-  const badge = isAdmin ? adminBadge() : isVerified ? verifiedBadge() : '';
-  const av = profile.avatar_url;
-  const name = profile.full_name || 'User';
-
-  document.title = `${name} — Truely`;
-
-  let actionButtons = '';
-  if (isOwnProfile) {
-    actionButtons = `<button class="follow-btn follow" onclick="toggleEditBio()" id="edit-bio-btn">Edit Profile</button>`;
-  } else if (user) {
-    actionButtons = `
-      <button class="msg-btn" onclick="window.location.href='/messages.html?to=${profileId}'">Message</button>
-      <button class="follow-btn ${isFollowing?'following':'follow'}" id="follow-btn" onclick="toggleFollow()">
-        ${isFollowing ? 'Following' : 'Follow'}
-      </button>`;
-  }
-
-  document.getElementById('profile-header').innerHTML = `
-    <div class="profile-top">
-      <div class="avatar av-xl${ring}">${av?`<img src="${av}"/>`:name.charAt(0).toUpperCase()}</div>
-      <div>${actionButtons}</div>
-    </div>
-    <div class="profile-info">
-      <div class="profile-name">${escHtml(name)}${badge}</div>
-      <div class="profile-handle" style="color:var(--muted);font-size:13px">${profile.email||''}</div>
-      <div class="profile-bio" id="bio-text">${escHtml(profile.bio||'')|| `<span style="color:var(--muted)">No bio yet${isOwnProfile?' — click Edit Profile to add':''}</span>`}</div>
-      ${isOwnProfile?`<div id="bio-edit-wrap" style="display:none"><textarea class="profile-bio-edit" id="bio-input" rows="3" placeholder="Write your bio...">${escHtml(profile.bio||'')}</textarea><div class="edit-actions"><button class="btn btn-primary btn-sm" onclick="saveBio()">Save</button><button class="btn btn-outline btn-sm" onclick="cancelEditBio()">Cancel</button></div></div>`:''}
-      <div class="profile-stats">
-        <div class="stat"><div class="stat-num" id="post-count">—</div><div class="stat-label">Posts</div></div>
-        <div class="stat"><div class="stat-num">${(followers||[]).length}</div><div class="stat-label">Followers</div></div>
-        <div class="stat"><div class="stat-num">${(following||[]).length}</div><div class="stat-label">Following</div></div>
-      </div>
-    </div>`;
-
-  loadUserPosts();
-}
-
-function toggleEditBio() {
-  document.getElementById('bio-text').style.display = 'none';
-  document.getElementById('bio-edit-wrap').style.display = 'block';
-  document.getElementById('edit-bio-btn').style.display = 'none';
-}
-function cancelEditBio() {
-  document.getElementById('bio-text').style.display = 'block';
-  document.getElementById('bio-edit-wrap').style.display = 'none';
-  document.getElementById('edit-bio-btn').style.display = 'block';
-}
-async function saveBio() {
-  const bio = document.getElementById('bio-input').value.trim();
-  await sb.from('profiles').update({ bio }).eq('id', window.TruelyState.currentUser.id);
-  document.getElementById('bio-text').innerHTML = escHtml(bio) || `<span style="color:var(--muted)">No bio yet</span>`;
-  cancelEditBio();
-  showToast('Bio updated ✓');
-}
-
-async function toggleFollow() {
-  const user = window.TruelyState.currentUser;
-  if (!user) { window.location.href = '/#login'; return; }
-  const btn = document.getElementById('follow-btn');
-  if (isFollowing) {
-    await sb.from('follows').delete().eq('follower_id', user.id).eq('following_id', profileId);
-    isFollowing = false;
-    btn.textContent = 'Follow';
-    btn.className = 'follow-btn follow';
-    showToast('Unfollowed');
-  } else {
-    await sb.from('follows').insert({ follower_id: user.id, following_id: profileId });
-    isFollowing = true;
-    btn.textContent = 'Following';
-    btn.className = 'follow-btn following';
-    await sb.from('notifications').insert({ user_id: profileId, from_user_id: user.id, type: 'follow' });
-    showToast('Following ✓');
-  }
-}
-
-async function loadUserPosts() {
-  const wrap = document.getElementById('profile-posts');
-  wrap.innerHTML = [1,2].map(()=>`<div class="skel-post"><div class="skel-row"><div class="skeleton skel-av"></div><div class="skel-lines"><div class="skeleton skel-line" style="width:80%"></div><div class="skeleton skel-line" style="width:60%"></div></div></div></div>`).join('');
-  const { data: posts } = await sb.from('posts').select('*').eq('author_id', profileId).order('created_at', { ascending: false });
-  document.getElementById('post-count').textContent = posts?.length || 0;
-  if (!posts || posts.length === 0) { wrap.innerHTML = '<div class="empty-state"><p>No posts yet</p></div>'; return; }
-  const user = window.TruelyState.currentUser;
-  let liked = new Set();
-  if (user) { const { data: ml } = await sb.from('likes').select('post_id').eq('user_id', user.id); (ml||[]).forEach(l=>liked.add(l.post_id)); }
-  const { data: al } = await sb.from('likes').select('post_id');
-  const lm = {}; (al||[]).forEach(l=>lm[l.post_id]=(lm[l.post_id]||0)+1);
-  wrap.innerHTML = posts.map(p => {
-    const isAdmin = profileData?.is_admin || profileData?.email === ADMIN_EMAIL;
-    const isVerified = profileData?.is_verified;
-    const av = profileData?.avatar_url;
-    const name = profileData?.full_name || 'User';
-    const ring = isAdmin?' admin-ring':isVerified?' verified-ring':'';
-    const lc = lm[p.id]||0, isLiked = liked.has(p.id);
-    const canDel = user?.email===ADMIN_EMAIL||user?.id===p.author_id;
-    const hf=isLiked?'var(--red)':'none',hs=isLiked?'var(--red)':'currentColor';
-    return `<div class="post-card" id="post-${p.id}">
-      <div class="post-top">
-        <div class="avatar av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0).toUpperCase()}</div>
-        <div class="post-body">
-          <div class="post-time">${timeAgo(p.created_at)}</div>
-          <div class="post-content">${escHtml(p.content)}</div>
-          <div class="post-actions">
-            <button class="act-btn like${isLiked?' liked':''}" id="lb-${p.id}" onclick="toggleLike(event,${p.id},${isLiked})">
-              <svg viewBox="0 0 24 24" fill="${hf}" stroke="${hs}" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-              <span id="lc-${p.id}">${lc}</span>
-            </button>
-            ${canDel?`<button class="del-btn" onclick="deletePost(event,${p.id})">🗑</button>`:''}
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function toggleLike(e,postId,liked){
-  e.stopPropagation();
-  const user=window.TruelyState.currentUser;
-  if(!user){window.location.href='/#login';return;}
-  const btn=document.getElementById(`lb-${postId}`),countEl=document.getElementById(`lc-${postId}`);
-  let count=parseInt(countEl.textContent)||0;
-  const path=btn.querySelector('path');
-  if(liked){
-    await sb.from('likes').delete().eq('post_id',postId).eq('user_id',user.id);
-    btn.className='act-btn like';path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');
-    countEl.textContent=Math.max(0,count-1);btn.setAttribute('onclick',`toggleLike(event,${postId},false)`);
-  }else{
-    await sb.from('likes').insert({post_id:postId,user_id:user.id});
-    btn.className='act-btn like liked';path.setAttribute('fill','var(--red)');path.setAttribute('stroke','var(--red)');
-    countEl.textContent=count+1;btn.setAttribute('onclick',`toggleLike(event,${postId},true)`);
-  }
-}
-
-async function deletePost(e,postId){
-  e.stopPropagation();
-  if(!confirm('Delete this post?'))return;
-  await sb.from('posts').delete().eq('id',postId);
-  const el=document.getElementById(`post-${postId}`);
-  if(el){el.style.opacity='0';el.style.transition='all 0.2s';setTimeout(()=>el.remove(),200);}
-  showToast('Deleted ✓');
-}
-
-initSharedAuth(()=>loadProfile());
-setTimeout(()=>{if(!window.TruelyState.currentUser)loadProfile();},400);
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/state.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/components.js"></script>
+  <script src="/js/profile.js"></script>
 </body>
 </html>
