@@ -1,291 +1,69 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Truely — Say What's Real</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style id="shared-css"></style>
-<style>
-.auth-wrap{display:flex;justify-content:center;align-items:center;min-height:calc(100vh - 56px);padding:24px;}
-.auth-card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:40px;width:100%;max-width:400px;animation:slideUp 0.3s ease;}
-.auth-logo{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--indigo),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;}
-.auth-sub{color:var(--muted);font-size:14px;margin-bottom:28px;}
-.or-line{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--muted);font-size:12px;}
-.or-line::before,.or-line::after{content:'';flex:1;height:1px;background:var(--border);}
-.btn-google{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.2s;}
-.btn-google:hover{border-color:var(--indigo);background:var(--hover);}
-.auth-switch{text-align:center;margin-top:20px;font-size:13px;color:var(--muted);}
-.auth-switch a{color:var(--indigo);cursor:pointer;font-weight:600;}
-.compose-box{background:var(--card);border-bottom:1px solid var(--border);padding:16px;display:none;}
-.compose-inner{display:flex;gap:12px;align-items:flex-start;}
-.compose-right{flex:1;}
-.compose-ta{width:100%;background:transparent;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:16px;color:var(--text);resize:none;min-height:80px;line-height:1.6;}
-.compose-ta::placeholder{color:var(--muted);}
-.compose-footer{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
-.char-count{font-size:13px;color:var(--muted);}
-.char-count.warn{color:var(--gold);}
-.char-count.over{color:var(--red);}
-.post-card{background:var(--card);border-bottom:1px solid var(--border);padding:16px;transition:background 0.15s;animation:fadeIn 0.3s ease;}
-.post-card:hover{background:var(--hover);}
-.post-top{display:flex;gap:12px;}
-.post-body{flex:1;}
-.post-user{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
-.post-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;}
-.post-name:hover{color:var(--indigo);}
-.post-time{font-size:13px;color:var(--muted);}
-.post-content{font-size:15px;line-height:1.65;margin-top:8px;color:var(--text);white-space:pre-wrap;word-break:break-word;cursor:pointer;}
-.post-actions{display:flex;align-items:center;gap:2px;margin-top:12px;}
-.act-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:100px;border:none;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--muted);transition:all 0.2s;}
-.act-btn:hover{background:var(--hover);}
-.act-btn.like.liked{color:var(--red);}
-.act-btn.like:hover{color:var(--red);background:rgba(239,68,68,0.08);}
-.act-btn.comment:hover{color:var(--indigo);background:rgba(79,70,229,0.08);}
-.act-btn.share:hover{color:var(--cyan);background:rgba(6,182,212,0.08);}
-.act-btn svg{width:17px;height:17px;}
-.del-btn{margin-left:auto;padding:5px 10px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;transition:all 0.2s;}
-.del-btn:hover{color:var(--red);background:rgba(239,68,68,0.08);}
-.comments-wrap{display:none;border-top:1px solid var(--border);margin-top:12px;padding-top:12px;}
-.comment-compose{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
-.comment-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:9px 14px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border 0.2s;}
-.comment-input:focus{border-color:var(--indigo);}
-.c-send{padding:8px 16px;border-radius:100px;background:var(--indigo);color:#fff;border:none;cursor:pointer;font-weight:600;font-size:13px;}
-.c-send:hover{background:var(--indigo-light);}
-.comment-item{display:flex;gap:8px;margin-bottom:10px;animation:fadeIn 0.2s ease;}
-.c-bubble{background:var(--bg);border-radius:14px;padding:9px 13px;flex:1;}
-.c-author{font-weight:600;font-size:13px;display:flex;align-items:center;gap:4px;margin-bottom:2px;}
-.c-text{font-size:14px;line-height:1.5;}
-.c-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 5px;margin-left:auto;}
-.c-del:hover{color:var(--red);}
-.skel-post{padding:16px;border-bottom:1px solid var(--border);}
-.skel-row{display:flex;gap:12px;}
-.skel-av{width:44px;height:44px;border-radius:50%;flex-shrink:0;}
-.skel-lines{flex:1;}
-.skel-line{height:12px;margin-bottom:8px;border-radius:6px;}
-.empty-state{text-align:center;padding:64px 20px;color:var(--muted);}
-.empty-icon{font-size:48px;margin-bottom:12px;}
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;justify-content:center;align-items:center;padding:20px;backdrop-filter:blur(4px);}
-.modal-bg.open{display:flex;}
-.modal-card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:32px;width:100%;max-width:400px;text-align:center;animation:slideUp 0.3s ease;}
-.modal-card h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:8px;}
-.payment-box{background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:14px;padding:16px;margin:16px 0;}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Truely - Say What's Real. Connect with friends and share your thoughts.">
+  <title>Truely — Feed</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/%3E%3C/svg%3E">
 </head>
 <body>
-<div id="nav-placeholder"></div>
-<div id="page-feed" class="page-wrap"><div class="wrap"><div class="compose-box" id="compose-box"><div class="compose-inner"><div class="avatar av-md" id="compose-av">T</div><div class="compose-right"><textarea class="compose-ta" id="compose-ta" placeholder="What's happening?" oninput="updateChar()"></textarea><div class="compose-footer"><span class="char-count" id="char-el">0 / 280</span><button class="btn btn-primary btn-sm" onclick="submitPost()">Post</button></div></div></div></div><div id="posts-wrap"></div></div></div>
-<div id="page-auth" class="page-wrap" style="display:none"><div class="auth-wrap"><div class="auth-card" id="auth-card"></div></div></div>
-<div class="modal-bg" id="verify-modal"><div class="modal-card"><h2>Get Verified ✓</h2><p style="color:var(--muted);font-size:14px;margin-bottom:4px">Blue badge + 600 char posts</p><div class="payment-box"><div style="font-size:13px;color:var(--muted);margin-bottom:4px">Pay via Bkash/Nagad:</div><div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--cyan)">01XXXXXXXXX</div><div style="font-size:13px;color:var(--muted);margin-top:4px">Amount: <b style="color:var(--text)">৳99/month</b></div></div><p style="font-size:13px;color:var(--muted);margin-bottom:20px">Contact admin after payment. Badge activated within 24h.</p><button class="btn btn-primary btn-full" onclick="document.getElementById('verify-modal').classList.remove('open')">Got it!</button></div></div>
-<div class="toast" id="toast"></div>
-<script src="/supabase.js"></script>
-<script>
-document.getElementById('shared-css').textContent = SHARED_CSS;
-document.getElementById('nav-placeholder').innerHTML = getNavHTML('feed');
-
-function showAuth(mode='login'){document.getElementById('page-feed').style.display='none';document.getElementById('page-auth').style.display='block';renderAuthCard(mode);}
-function showFeed(){document.getElementById('page-feed').style.display='block';document.getElementById('page-auth').style.display='none';}
-
-function renderAuthCard(mode){
-  const c=document.getElementById('auth-card');
-  if(mode==='signup'){c.innerHTML=`<div class="auth-logo">Truely</div><p class="auth-sub">Join the conversation 🌍</p><div class="msg" id="msg-su"></div><div class="form-group"><label>Full Name</label><input id="su-name" type="text" placeholder="Your name"/></div><div class="form-group"><label>Email</label><input id="su-email" type="email" placeholder="email@example.com"/></div><div class="form-group"><label>Password</label><input id="su-pass" type="password" placeholder="Min 6 characters"/></div><button class="btn btn-primary btn-full" onclick="doSignUp()">Create Account</button><div class="or-line">or</div><button class="btn-google" onclick="googleAuth()"><img src="https://www.google.com/favicon.ico" width="18"/> Continue with Google</button><div class="auth-switch">Already on Truely? <a onclick="renderAuthCard('login')">Sign In</a></div>`;}
-  else{c.innerHTML=`<div class="auth-logo">Truely</div><p class="auth-sub">Welcome back 👋</p><div class="msg" id="msg-li"></div><div class="form-group"><label>Email</label><input id="li-email" type="email" placeholder="email@example.com"/></div><div class="form-group"><label>Password</label><input id="li-pass" type="password" placeholder="Your password"/></div><button class="btn btn-primary btn-full" onclick="doSignIn()">Sign In</button><div class="or-line">or</div><button class="btn-google" onclick="googleAuth()"><img src="https://www.google.com/favicon.ico" width="18"/> Continue with Google</button><div class="auth-switch">New to Truely? <a onclick="renderAuthCard('signup')">Join now</a></div>`;}
-}
-
-window.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('nav-login').onclick=()=>showAuth('login');
-  document.getElementById('nav-signup').onclick=()=>showAuth('signup');
-  if(window.location.hash==='#login')showAuth('login');
-  else if(window.location.hash==='#signup')showAuth('signup');
-  if(window.location.search.includes('verify=1'))document.getElementById('verify-modal').classList.add('open');
-});
-
-async function googleAuth(){await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});}
-async function doSignUp(){
-  const name=document.getElementById('su-name').value.trim(),email=document.getElementById('su-email').value.trim(),pass=document.getElementById('su-pass').value,msg=document.getElementById('msg-su');
-  msg.className='msg';
-  if(!name||!email||!pass){msg.className='msg error';msg.textContent='Please fill all fields!';return;}
-  if(pass.length<6){msg.className='msg error';msg.textContent='Password must be 6+ characters!';return;}
-  const{error}=await sb.auth.signUp({email,password:pass,options:{data:{full_name:name}}});
-  if(error){msg.className='msg error';msg.textContent=error.message;}
-  else{msg.className='msg success';msg.textContent='✅ Account created! Check email to verify.';}
-}
-async function doSignIn(){
-  const email=document.getElementById('li-email').value.trim(),pass=document.getElementById('li-pass').value,msg=document.getElementById('msg-li');
-  msg.className='msg';
-  if(!email||!pass){msg.className='msg error';msg.textContent='Please fill all fields!';return;}
-  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
-  if(error){msg.className='msg error';msg.textContent='Wrong email or password!';}
-  else{window.TruelyState.currentUser=data.user;await loadSharedProfile(data.user);showLoggedInNav();showFeed();updateCompose();loadPosts();}
-}
-
-function updateCompose(){
-  const p=window.TruelyState.userProfile,av=p?.avatar_url,name=p?.full_name||'U';
-  const el=document.getElementById('compose-av');
-  if(el)el.innerHTML=av?`<img src="${av}"/>`:name.charAt(0).toUpperCase();
-  document.getElementById('compose-box').style.display=window.TruelyState.currentUser?'block':'none';
-  updateChar();
-}
-function updateChar(){
-  const text=document.getElementById('compose-ta')?.value||'',limit=getPostLimit(),el=document.getElementById('char-el');
-  if(!el)return;
-  if(limit===Infinity){el.textContent=`${text.length} / ∞`;el.className='char-count';return;}
-  el.textContent=`${text.length} / ${limit}`;
-  el.className='char-count'+(text.length>limit?' over':text.length>limit*0.85?' warn':'');
-}
-async function submitPost(){
-  const user=window.TruelyState.currentUser;
-  if(!user){showAuth('login');return;}
-  const text=document.getElementById('compose-ta').value.trim(),limit=getPostLimit();
-  if(!text){showToast('Write something first!');return;}
-  if(limit!==Infinity&&text.length>limit){showToast(`Too long! Max ${limit} chars`);return;}
-  const{error}=await sb.from('posts').insert({content:text,author_id:user.id});
-  if(error){showToast('Failed to post','error');return;}
-  document.getElementById('compose-ta').value='';updateChar();showToast('Posted! ✓');loadPosts();
-}
-
-async function loadPosts(){
-  const wrap=document.getElementById('posts-wrap');
-  wrap.innerHTML=[1,2,3].map(()=>`<div class="skel-post"><div class="skel-row"><div class="skeleton skel-av"></div><div class="skel-lines"><div class="skeleton skel-line" style="width:40%"></div><div class="skeleton skel-line" style="width:80%"></div><div class="skeleton skel-line" style="width:60%"></div></div></div></div>`).join('');
-  const{data:posts}=await sb.from('posts').select('*').order('created_at',{ascending:false});
-  if(!posts||posts.length===0){wrap.innerHTML='<div class="empty-state"><div class="empty-icon">✨</div><p>No posts yet. Be the first!</p></div>';return;}
-  const ids=[...new Set(posts.map(p=>p.author_id))];
-  const{data:profiles}=await sb.from('profiles').select('*').in('id',ids);
-  const pm={};(profiles||[]).forEach(p=>pm[p.id]=p);
-  const user=window.TruelyState.currentUser;
-  let liked=new Set();
-  if(user){const{data:ml}=await sb.from('likes').select('post_id').eq('user_id',user.id);(ml||[]).forEach(l=>liked.add(l.post_id));}
-  const{data:al}=await sb.from('likes').select('post_id');
-  const lm={};(al||[]).forEach(l=>lm[l.post_id]=(lm[l.post_id]||0)+1);
-  const{data:ac}=await sb.from('comments').select('post_id');
-  const cm={};(ac||[]).forEach(c=>cm[c.post_id]=(cm[c.post_id]||0)+1);
-  wrap.innerHTML=posts.map(p=>renderPost(p,pm[p.author_id],liked.has(p.id),lm[p.id]||0,cm[p.id]||0)).join('');
-}
-
-function renderPost(post,profile,liked,lc,cc){
-  const name=profile?.full_name||'User',av=profile?.avatar_url;
-  const isAdmin=profile?.is_admin||profile?.email===ADMIN_EMAIL,isVerified=profile?.is_verified;
-  const ring=isAdmin?' admin-ring':isVerified?' verified-ring':'';
-  const badge=isAdmin?adminBadge():isVerified?verifiedBadge():'';
-  const user=window.TruelyState.currentUser;
-  const canDel=user?.email===ADMIN_EMAIL||user?.id===post.author_id;
-  const hf=liked?'var(--red)':'none',hs=liked?'var(--red)':'currentColor';
-  const compAv=window.TruelyState.userProfile;
-  return `<div class="post-card" id="post-${post.id}">
-    <div class="post-top">
-      <div class="avatar av-md${ring}" onclick="goToProfile('${post.author_id}')" style="cursor:pointer">${av?`<img src="${av}"/>`:name.charAt(0).toUpperCase()}</div>
-      <div class="post-body">
-        <div class="post-user">
-          <span class="post-name" onclick="goToProfile('${post.author_id}')">${escHtml(name)}</span>${badge}
-          <span class="post-time">· ${timeAgo(post.created_at)}</span>
-        </div>
-        <div class="post-content">${escHtml(post.content)}</div>
-        <div class="post-actions">
-          <button class="act-btn like${liked?' liked':''}" id="lb-${post.id}" onclick="toggleLike(event,${post.id},${liked})">
-            <svg viewBox="0 0 24 24" fill="${hf}" stroke="${hs}" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            <span id="lc-${post.id}">${lc}</span>
-          </button>
-          <button class="act-btn comment" onclick="toggleComments(event,${post.id})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span id="cc-${post.id}">${cc}</span>
-          </button>
-          <button class="act-btn share" onclick="sharePost(event,${post.id})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-          </button>
-          ${canDel?`<button class="del-btn" onclick="deletePost(event,${post.id})">🗑</button>`:''}
-        </div>
-        <div class="comments-wrap" id="cw-${post.id}">
-          ${user?`<div class="comment-compose"><div class="avatar av-xs">${compAv?.avatar_url?`<img src="${compAv.avatar_url}"/>`:((compAv?.full_name||'U').charAt(0))}</div><input class="comment-input" id="ci-${post.id}" placeholder="Reply..." onkeydown="if(event.key==='Enter')submitComment(${post.id})"/><button class="c-send" onclick="submitComment(${post.id})">↑</button></div>`:`<p style="font-size:13px;color:var(--muted);margin-bottom:10px"><a onclick="showAuth('login')" style="color:var(--indigo);cursor:pointer">Sign in</a> to reply</p>`}
-          <div id="cl-${post.id}"></div>
+  <div id="nav-placeholder"></div>
+  
+  <main class="page-wrap">
+    <div class="container">
+      <div id="compose-box" class="compose-box" style="display: none;">
+        <div class="compose-inner">
+          <div class="avatar avatar-md" id="compose-avatar"></div>
+          <div class="compose-right">
+            <textarea id="post-content" class="compose-textarea" placeholder="What's happening?" maxlength="600" rows="3"></textarea>
+            <div class="compose-footer">
+              <span class="char-count" id="char-count">0 / 280</span>
+              <button class="btn btn-primary btn-sm" id="post-submit">Post</button>
+            </div>
+          </div>
         </div>
       </div>
+      
+      <div id="posts-container"></div>
     </div>
-  </div>`;
-}
+  </main>
+  
+  <div id="toast-container" class="toast-container"></div>
+  
+  <div id="verify-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Get Verified</div>
+      <div class="modal-body">
+        <p style="margin-bottom: var(--spacing-md);">Upgrade to verified account:</p>
+        <div style="background: var(--bg-secondary); padding: var(--spacing-md); border-radius: var(--radius-lg); margin-bottom: var(--spacing-md);">
+          <p style="font-weight: 600; margin-bottom: var(--spacing-xs);">Benefits:</p>
+          <ul style="margin-left: var(--spacing-lg); color: var(--text-secondary);">
+            <li>✓ Blue verification badge</li>
+            <li>✓ 600 character posts (instead of 280)</li>
+            <li>✓ 400 character messages</li>
+            <li>✓ Priority support</li>
+          </ul>
+        </div>
+        <div style="background: rgba(79, 70, 229, 0.1); padding: var(--spacing-md); border-radius: var(--radius-lg); text-align: center;">
+          <p style="font-weight: 600; color: var(--accent-indigo);">Contact Admin</p>
+          <p class="text-muted" style="font-size: 0.875rem;">Email: alamin05052008@gmail.com</p>
+          <p class="text-muted" style="font-size: 0.75rem;">Payment: 99 BDT/month</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeVerifyModal()">Close</button>
+      </div>
+    </div>
+  </div>
 
-function goToProfile(userId){window.location.href=`/profile.html?id=${userId}`;}
-
-async function toggleLike(e,postId,liked){
-  e.stopPropagation();
-  const user=window.TruelyState.currentUser;
-  if(!user){showToast('Sign in to like');showAuth('login');return;}
-  const btn=document.getElementById(`lb-${postId}`),countEl=document.getElementById(`lc-${postId}`);
-  let count=parseInt(countEl.textContent)||0;
-  const path=btn.querySelector('path');
-  if(liked){
-    await sb.from('likes').delete().eq('post_id',postId).eq('user_id',user.id);
-    btn.className='act-btn like';path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');
-    countEl.textContent=Math.max(0,count-1);btn.setAttribute('onclick',`toggleLike(event,${postId},false)`);
-  }else{
-    await sb.from('likes').insert({post_id:postId,user_id:user.id});
-    btn.className='act-btn like liked';path.setAttribute('fill','var(--red)');path.setAttribute('stroke','var(--red)');
-    countEl.textContent=count+1;btn.setAttribute('onclick',`toggleLike(event,${postId},true)`);
-    const{data:post}=await sb.from('posts').select('author_id').eq('id',postId).single();
-    if(post&&post.author_id!==user.id)await sb.from('notifications').insert({user_id:post.author_id,from_user_id:user.id,type:'like',post_id:postId});
-  }
-}
-
-async function toggleComments(e,postId){
-  e.stopPropagation();
-  const wrap=document.getElementById(`cw-${postId}`);
-  const open=wrap.style.display==='block';
-  wrap.style.display=open?'none':'block';
-  if(!open)loadComments(postId);
-}
-
-async function loadComments(postId){
-  const list=document.getElementById(`cl-${postId}`);
-  list.innerHTML='<div class="skeleton skel-line" style="width:50%"></div>';
-  const{data:comments}=await sb.from('comments').select('*').eq('post_id',postId).order('created_at',{ascending:true});
-  if(!comments||comments.length===0){list.innerHTML='<p style="font-size:13px;color:var(--muted)">No replies yet</p>';return;}
-  const ids=[...new Set(comments.map(c=>c.user_id))];
-  const{data:profiles}=await sb.from('profiles').select('*').in('id',ids);
-  const pm={};(profiles||[]).forEach(p=>pm[p.id]=p);
-  const user=window.TruelyState.currentUser;
-  list.innerHTML=comments.map(c=>{
-    const p=pm[c.user_id],name=p?.full_name||'User',av=p?.avatar_url;
-    const isAdmin=p?.is_admin||p?.email===ADMIN_EMAIL,isVerified=p?.is_verified;
-    const badge=isAdmin?adminBadge():isVerified?verifiedBadge(13):'';
-    const canDel=user?.email===ADMIN_EMAIL||user?.id===c.user_id;
-    return `<div class="comment-item" id="cm-${c.id}"><div class="avatar av-xs">${av?`<img src="${av}"/>`:name.charAt(0)}</div><div class="c-bubble"><div class="c-author">${escHtml(name)}${badge}${canDel?`<button class="c-del" onclick="delComment(${c.id},${postId})">✕</button>`:''}</div><div class="c-text">${escHtml(c.content)}</div></div></div>`;
-  }).join('');
-}
-
-async function submitComment(postId){
-  const user=window.TruelyState.currentUser;
-  if(!user){showAuth('login');return;}
-  const input=document.getElementById(`ci-${postId}`),text=input.value.trim();
-  if(!text)return;
-  await sb.from('comments').insert({post_id:postId,user_id:user.id,content:text});
-  input.value='';loadComments(postId);
-  const cc=document.getElementById(`cc-${postId}`);cc.textContent=parseInt(cc.textContent||0)+1;
-  const{data:post}=await sb.from('posts').select('author_id').eq('id',postId).single();
-  if(post&&post.author_id!==user.id)await sb.from('notifications').insert({user_id:post.author_id,from_user_id:user.id,type:'comment',post_id:postId});
-}
-
-async function delComment(cId,postId){
-  await sb.from('comments').delete().eq('id',cId);
-  document.getElementById(`cm-${cId}`)?.remove();
-  const cc=document.getElementById(`cc-${postId}`);cc.textContent=Math.max(0,parseInt(cc.textContent||0)-1);
-}
-
-async function deletePost(e,postId){
-  e.stopPropagation();
-  if(!confirm('Delete this post?'))return;
-  await sb.from('posts').delete().eq('id',postId);
-  const el=document.getElementById(`post-${postId}`);
-  if(el){el.style.opacity='0';el.style.transform='scale(0.97)';el.style.transition='all 0.2s';setTimeout(()=>el.remove(),200);}
-  showToast('Deleted ✓');
-}
-
-async function sharePost(e,postId){
-  e.stopPropagation();
-  const url=`${window.location.origin}/post/${postId}`;
-  if(navigator.share){try{await navigator.share({title:'Truely',url});}catch(err){}}
-  else{await navigator.clipboard.writeText(url);showToast('Link copied! 🔗');}
-}
-
-initSharedAuth(()=>{showFeed();updateCompose();loadPosts();});
-setTimeout(()=>{if(!window.TruelyState.currentUser)loadPosts();},400);
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/state.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/components.js"></script>
+  <script src="/js/feed.js"></script>
 </body>
 </html>
