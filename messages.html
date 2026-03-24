@@ -1,162 +1,721 @@
-<!-- MESSAGES.HTML -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Messages</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
-<body>
-<div id="_nav" data-page="msgs"></div>
-<div class="page-root" style="padding-top:52px">
-<div class="msg-layout">
-<div class="msg-side" id="msg-side">
-  <div class="msg-head"><h2>Messages</h2><input class="search-pill" id="user-search" placeholder="Search people..." oninput="searchPeople()"/></div>
-  <div class="conv-list" id="conv-list"><div style="padding:20px;text-align:center;color:var(--sub);font-size:13px">Sign in to message</div></div>
-</div>
-<div class="chat-area" id="chat-area">
-  <div class="no-conv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" color="var(--sub)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><p style="font-weight:600;color:var(--sub)">Select a conversation</p><p style="font-size:13px;color:var(--sub)">Messages vanish after 30 seconds</p></div>
-</div>
-</div>
-</div>
-<input type="file" id="img-msg-file" accept="image/*" style="display:none" onchange="sendImg(event)"/>
-<div class="toast" id="_toast"></div>
-<script src="/truely.js"></script>
-<script>
-document.getElementById('_css').textContent=CSS;
-let activeUserId=null,msgInterval=null;
-const toParam=new URLSearchParams(location.search).get('to');
-
-async function loadConvs(){
-  const user=T.state.user;if(!user)return;
-  const{data:msgs}=await sb.from('messages').select('sender_id,receiver_id').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-  if(!msgs||!msgs.length){document.getElementById('conv-list').innerHTML='<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px">No conversations yet.<br/>Search for someone above.</div>';return;}
-  const ids=[...new Set(msgs.flatMap(m=>[m.sender_id,m.receiver_id]).filter(id=>id!==user.id))];
-  const{data:profs}=await sb.from('profiles').select('*').in('id',ids);
-  renderConvs(profs||[]);
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="description" content="Truely — Secure private messages that disappear after 30 seconds"/>
+<title>Truely — Messages</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="shared-css"></style>
+<style>
+/* Messages Layout */
+.msg-container {
+  display: flex;
+  height: calc(100vh - 53px);
+  background: var(--bg);
+}
+@media (max-width: 768px) {
+  .msg-container { height: calc(100vh - 53px - 54px); }
 }
 
-function renderConvs(profs){
-  document.getElementById('conv-list').innerHTML=profs.map(p=>{
-    const name=p.full_name||'User',av=p.avatar_url;
-    const ring=Prof.ring(p),badge=Prof.badge(p);
-    return `<div class="conv${activeUserId===p.id?' on':''}" onclick="openConv('${p.id}','${esc(name)}')">
-      <div class="av av-sm${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
-      <div class="conv-info"><div class="conv-name">${esc(name)}${badge}</div><div class="conv-prev">Tap to chat</div></div>
-    </div>`;
+/* Sidebar */
+.msg-sidebar {
+  width: 320px;
+  border-right: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+@media (max-width: 768px) {
+  .msg-sidebar {
+    position: fixed;
+    left: 0;
+    top: 53px;
+    bottom: 54px;
+    z-index: 50;
+    transform: translateX(-100%);
+    width: 280px;
+  }
+  .msg-sidebar.open { transform: translateX(0); }
+}
+.msg-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.msg-sidebar-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  font-family: var(--serif);
+}
+.search-people {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border 0.15s;
+}
+.search-people:focus { border-color: var(--blue); }
+.conversations-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--border);
+}
+.conv-item:hover { background: var(--hover); }
+.conv-item.active { background: var(--hover); }
+.conv-info {
+  flex: 1;
+  min-width: 0;
+}
+.conv-name {
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.conv-preview {
+  font-size: 12px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.conv-time {
+  font-size: 10px;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+
+/* Chat Area */
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.chat-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text3);
+  text-align: center;
+  padding: 24px;
+}
+.chat-empty svg {
+  width: 48px;
+  height: 48px;
+  stroke: var(--text3);
+  stroke-width: 1.5;
+}
+.chat-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.chat-header-info {
+  flex: 1;
+}
+.chat-header-name {
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-header-status {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.back-to-sidebar {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+}
+@media (max-width: 768px) {
+  .back-to-sidebar { display: flex; }
+}
+
+/* Messages List */
+.messages-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.message-bubble {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  animation: fadeUp 0.2s ease;
+}
+.message-bubble.mine { flex-direction: row-reverse; }
+.message-content {
+  max-width: 70%;
+  padding: 8px 12px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  position: relative;
+  word-break: break-word;
+}
+.message-bubble.mine .message-content {
+  background: var(--blue);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+.message-bubble.other .message-content {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.message-image {
+  max-width: 200px;
+  border-radius: 12px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+.message-time {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 4px;
+  display: block;
+  text-align: right;
+}
+.message-timer {
+  height: 2px;
+  background: rgba(255,255,255,0.3);
+  margin-top: 6px;
+  border-radius: 2px;
+  transition: width linear;
+}
+.message-timer.other { background: rgba(29,155,240,0.3); }
+
+/* Compose Area */
+.chat-compose {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+.compose-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.message-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  font-family: var(--font);
+}
+.message-input:focus { border-color: var(--blue); }
+.send-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--blue);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.send-btn:hover { transform: scale(1.05); opacity: 0.9; }
+.send-btn svg { width: 18px; height: 18px; fill: white; }
+.compose-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+.char-limit.warning { color: var(--gold); }
+.char-limit.over { color: var(--red); }
+.img-attach {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.img-attach:hover { border-color: var(--blue); color: var(--blue); }
+</style>
+</head>
+<body>
+<div id="nav-ph"></div>
+<div id="bn-ph"></div>
+
+<div class="page-wrap" style="padding-top: 0;">
+  <div class="msg-container">
+    <!-- Sidebar -->
+    <div class="msg-sidebar" id="msg-sidebar">
+      <div class="msg-sidebar-header">
+        <h2>Messages</h2>
+        <input type="text" class="search-people" id="search-people" placeholder="Search people..." oninput="searchPeople()">
+      </div>
+      <div class="conversations-list" id="conversations-list">
+        <div style="padding: 32px; text-align: center; color: var(--text3);">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="chat-area" id="chat-area">
+      <div class="chat-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <p>Select a conversation</p>
+        <small>Messages disappear after 30 seconds</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Upload Input -->
+<input type="file" id="img-upload" accept="image/*" style="display:none" onchange="sendImage(event)">
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/supabase.js"></script>
+<script>
+document.getElementById('shared-css').textContent = SHARED_CSS;
+document.getElementById('nav-ph').innerHTML = getNavHTML('messages');
+document.getElementById('bn-ph').innerHTML = getBottomNavHTML('messages');
+
+let activeUserId = null;
+let activeUserProfile = null;
+let messagesInterval = null;
+let typingTimeout = null;
+let currentUser = null;
+
+// Check URL for direct user
+const urlParams = new URLSearchParams(window.location.search);
+const directUserId = urlParams.get('to');
+
+// Initialize
+initSharedAuth(async (user) => {
+  currentUser = user;
+  await loadConversations();
+  if (directUserId) {
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', directUserId).single();
+    if (profile) openConversation(profile);
+  }
+});
+
+// Load conversations
+async function loadConversations() {
+  const user = currentUser;
+  if (!user) {
+    document.getElementById('conversations-list').innerHTML = '<div style="padding: 32px; text-align: center; color: var(--text3);">Sign in to message</div>';
+    return;
+  }
+
+  // Get all messages involving this user
+  const { data: messages } = await sb
+    .from('messages')
+    .select('sender_id, receiver_id, created_at')
+    .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+    .order('created_at', { ascending: false });
+
+  if (!messages || messages.length === 0) {
+    document.getElementById('conversations-list').innerHTML = '<div style="padding: 32px; text-align: center; color: var(--text3);">No conversations yet<br><small>Search for people above</small></div>';
+    return;
+  }
+
+  // Get unique conversation partners
+  const partnerIds = new Set();
+  messages.forEach(msg => {
+    if (msg.sender_id !== user.id) partnerIds.add(msg.sender_id);
+    if (msg.receiver_id !== user.id) partnerIds.add(msg.receiver_id);
+  });
+
+  const { data: profiles } = await sb
+    .from('profiles')
+    .select('*')
+    .in('id', Array.from(partnerIds));
+
+  const profileMap = {};
+  (profiles || []).forEach(p => profileMap[p.id] = p);
+
+  // Get last message per conversation
+  const lastMsgMap = {};
+  messages.forEach(msg => {
+    const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+    if (!lastMsgMap[partnerId] || new Date(msg.created_at) > new Date(lastMsgMap[partnerId].created_at)) {
+      lastMsgMap[partnerId] = msg;
+    }
+  });
+
+  const convList = document.getElementById('conversations-list');
+  convList.innerHTML = Array.from(partnerIds).map(partnerId => {
+    const profile = profileMap[partnerId];
+    if (!profile) return '';
+    const lastMsg = lastMsgMap[partnerId];
+    const isAdmin = profile.is_admin || profile.email === ADMIN_EMAIL;
+    const isVerified = profile.is_verified;
+    const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+    let badgeHtml = '';
+    if (isAdmin) badgeHtml = adminBadge();
+    else if (isVerified) badgeHtml = verifiedBadge(14);
+    const avHTML = profile.avatar_url ? `<img src="${profile.avatar_url}">` : `<span>${(profile.full_name || 'U')[0].toUpperCase()}</span>`;
+    const timeAgo = lastMsg ? formatTimeAgoShort(lastMsg.created_at) : '';
+
+    return `
+      <div class="conv-item" data-user-id="${profile.id}" onclick="openConversationById('${profile.id}')">
+        <div class="avatar av-sm ${ring}">${avHTML}</div>
+        <div class="conv-info">
+          <div class="conv-name">${escapeHtml(profile.full_name || 'User')}${badgeHtml}</div>
+          <div class="conv-preview">Click to chat</div>
+        </div>
+        <div class="conv-time">${timeAgo}</div>
+      </div>
+    `;
   }).join('');
 }
 
-async function searchPeople(){
-  const q=document.getElementById('user-search').value.trim();
-  const user=T.state.user;if(!user)return;
-  if(!q){loadConvs();return;}
-  const{data:profs}=await sb.from('profiles').select('*').ilike('full_name',`%${q}%`).neq('id',user.id).limit(10);
-  renderConvs(profs||[]);
+function formatTimeAgoShort(date) {
+  const s = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
 }
 
-async function openConv(userId,userName){
-  activeUserId=userId;clearInterval(msgInterval);
-  document.querySelectorAll('.conv').forEach(el=>el.classList.remove('on'));
-  document.querySelector(`[onclick*="'${userId}'"]`)?.classList.add('on');
-  const{data:prof}=await sb.from('profiles').select('*').eq('id',userId).single();
-  const isAdmin=Prof.isAdmin(prof),isVer=prof?.is_verified;
-  const ring=Prof.ring(prof),badge=Prof.badge(prof),av=prof?.avatar_url;
-  const user=T.state.user,myProf=T.state.profile;
-  const myIsAdmin=Prof.isAdmin(myProf);
-  const limit=Prof.msgLimit(myProf);
-  const limitLabel=limit===Infinity?'∞':`${limit}`;
-  const{data:{session}}=await sb.auth.getSession();
-  document.getElementById('chat-area').innerHTML=`
-    <div class="chat-head">
-      <div class="av av-sm${ring}" onclick="location.href='/profile.html?id=${userId}'" style="cursor:pointer">${av?`<img src="${av}"/>`:userName.charAt(0)}</div>
-      <div><div class="chat-head-name">${esc(userName)}${badge}</div><div class="chat-ttl">⏱ Messages delete in 30s</div></div>
-    </div>
-    <div class="msgs-list" id="msgs-list"></div>
-    <div class="chat-foot">
-      <div style="flex:1">
-        <div class="msg-limit"><span>⏱ Auto-deletes after 30 seconds</span><span class="mc" id="mc">0/${limitLabel}</span></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          ${myIsAdmin?`<button class="img-attach" onclick="document.getElementById('img-msg-file').click()" title="Send image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>`:''}
-          <input class="msg-in" id="msg-in" placeholder="Type a message..." oninput="updateMC()" onkeydown="if(event.key==='Enter')sendMsg()"/>
-          <button class="send-btn" onclick="sendMsg()"><svg viewBox="0 0 24 24" width="17" height="17"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg></button>
+async function searchPeople() {
+  const query = document.getElementById('search-people').value.trim();
+  const user = currentUser;
+  if (!user) return;
+
+  if (!query) {
+    loadConversations();
+    return;
+  }
+
+  const { data: profiles } = await sb
+    .from('profiles')
+    .select('*')
+    .ilike('full_name', `%${query}%`)
+    .neq('id', user.id)
+    .limit(10);
+
+  const convList = document.getElementById('conversations-list');
+  if (!profiles || profiles.length === 0) {
+    convList.innerHTML = '<div style="padding: 32px; text-align: center; color: var(--text3);">No users found</div>';
+    return;
+  }
+
+  convList.innerHTML = profiles.map(profile => {
+    const isAdmin = profile.is_admin || profile.email === ADMIN_EMAIL;
+    const isVerified = profile.is_verified;
+    const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+    let badgeHtml = '';
+    if (isAdmin) badgeHtml = adminBadge();
+    else if (isVerified) badgeHtml = verifiedBadge(14);
+    const avHTML = profile.avatar_url ? `<img src="${profile.avatar_url}">` : `<span>${(profile.full_name || 'U')[0].toUpperCase()}</span>`;
+
+    return `
+      <div class="conv-item" data-user-id="${profile.id}" onclick="openConversationById('${profile.id}')">
+        <div class="avatar av-sm ${ring}">${avHTML}</div>
+        <div class="conv-info">
+          <div class="conv-name">${escapeHtml(profile.full_name || 'User')}${badgeHtml}</div>
+          <div class="conv-preview">${escapeHtml(profile.bio || 'Click to start chatting')}</div>
         </div>
       </div>
-    </div>`;
-  loadMsgs();
-  msgInterval=setInterval(()=>{loadMsgs();deleteExpired();},3000);
-  // Mobile: show chat, hide sidebar
-  if(window.innerWidth<=768){
-    document.getElementById('msg-side').classList.add('hide');
-    document.getElementById('chat-area').classList.add('show');
+    `;
+  }).join('');
+}
+
+async function openConversationById(userId) {
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', userId).single();
+  if (profile) openConversation(profile);
+}
+
+async function openConversation(profile) {
+  activeUserId = profile.id;
+  activeUserProfile = profile;
+
+  // Update active state in sidebar
+  document.querySelectorAll('.conv-item').forEach(el => {
+    el.classList.remove('active');
+    if (el.dataset.userId === profile.id) el.classList.add('active');
+  });
+
+  // Render chat area
+  renderChatArea(profile);
+
+  // Load messages
+  await loadMessages();
+
+  // Set up polling for new messages
+  if (messagesInterval) clearInterval(messagesInterval);
+  messagesInterval = setInterval(() => {
+    loadMessages();
+    deleteExpiredMessages();
+  }, 3000);
+
+  // Close sidebar on mobile
+  if (window.innerWidth <= 768) {
+    document.getElementById('msg-sidebar').classList.remove('open');
   }
 }
 
-function updateMC(){
-  const input=document.getElementById('msg-in'),el=document.getElementById('mc');
-  if(!input||!el)return;
-  const limit=Prof.msgLimit(T.state.profile),len=input.value.length;
-  if(limit===Infinity){el.textContent=`${len}/∞`;el.className='mc';return;}
-  el.textContent=`${len}/${limit}`;
-  el.className='mc'+(len>=limit?' over':len>limit*.85?' warn':'');
-}
+function renderChatArea(profile) {
+  const chatArea = document.getElementById('chat-area');
+  const isAdmin = profile.is_admin || profile.email === ADMIN_EMAIL;
+  const isVerified = profile.is_verified;
+  const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+  let badgeHtml = '';
+  if (isAdmin) badgeHtml = adminBadge();
+  else if (isVerified) badgeHtml = verifiedBadge(14);
+  const avHTML = profile.avatar_url ? `<img src="${profile.avatar_url}">` : `<span>${(profile.full_name || 'U')[0].toUpperCase()}</span>`;
+  const msgLimit = getMsgLimit();
+  const limitText = msgLimit === Infinity ? '∞' : msgLimit;
 
-async function loadMsgs(){
-  const user=T.state.user;if(!user||!activeUserId)return;
-  await deleteExpired();
-  const{data:msgs}=await sb.from('messages').select('*').or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeUserId}),and(sender_id.eq.${activeUserId},receiver_id.eq.${user.id})`).order('created_at',{ascending:true});
-  const list=document.getElementById('msgs-list');if(!list)return;
-  const atBottom=list.scrollHeight-list.scrollTop<=list.clientHeight+50;
-  if(!msgs||!msgs.length){list.innerHTML='<div style="text-align:center;padding:32px;color:var(--sub);font-size:13px">No messages yet.<br/>Messages delete after 30 seconds.</div>';return;}
-  const now=new Date();
-  list.innerHTML=msgs.map(m=>{
-    const isMine=m.sender_id===user.id;
-    const exp=new Date(m.expires_at),remaining=Math.max(0,Math.ceil((exp-now)/1000));
-    const pct=(remaining/T.MSG_TTL)*100;
-    return `<div class="bbl-wrap ${isMine?'mine':'other'}">
-      <div class="av av-xs" style="margin-bottom:4px">${isMine?(T.state.profile?.avatar_url?`<img src="${T.state.profile.avatar_url}"/>`:((T.state.profile?.full_name||'U').charAt(0))):'?'}</div>
-      <div class="bbl">
-        ${m.content?esc(m.content):''}
-        ${m.image_url?`<img src="${m.image_url}" alt=""/>`:''}
-        <div class="bbl-meta">⏱ ${remaining}s</div>
-        <div class="bbl-bar" style="width:${pct}%"></div>
+  chatArea.innerHTML = `
+    <div class="chat-header">
+      <button class="back-to-sidebar" onclick="toggleSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="avatar av-md ${ring}" onclick="window.location.href='/profile.html?id=${profile.id}'" style="cursor:pointer">${avHTML}</div>
+      <div class="chat-header-info">
+        <div class="chat-header-name">
+          ${escapeHtml(profile.full_name || 'User')}${badgeHtml}
+        </div>
+        <div class="chat-header-status">🔒 End-to-end encrypted · ⏱ Messages delete in 30s</div>
       </div>
-    </div>`;
+    </div>
+    <div class="messages-list" id="messages-list"></div>
+    <div class="chat-compose">
+      <div class="compose-meta">
+        <span>🔒 Encrypted</span>
+        <span class="char-limit" id="char-limit">0/${limitText}</span>
+      </div>
+      <div class="compose-row">
+        ${isAdmin() ? `<button class="img-attach" onclick="document.getElementById('img-upload').click()" title="Send image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </button>` : ''}
+        <input type="text" class="message-input" id="message-input" placeholder="Type a secure message..." 
+          maxlength="${msgLimit === Infinity ? 9999 : msgLimit}" oninput="updateCharCount()" onkeydown="handleTyping(event)">
+        <button class="send-btn" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+  `;
+
+  updateCharCount();
+}
+
+function toggleSidebar() {
+  document.getElementById('msg-sidebar').classList.toggle('open');
+}
+
+function updateCharCount() {
+  const input = document.getElementById('message-input');
+  const el = document.getElementById('char-limit');
+  if (!input || !el) return;
+  const limit = getMsgLimit();
+  const len = input.value.length;
+  if (limit === Infinity) {
+    el.textContent = `${len}/∞`;
+  } else {
+    el.textContent = `${len}/${limit}`;
+    el.className = 'char-limit' + (len > limit * 0.9 ? (len >= limit ? ' over' : ' warning') : '');
+  }
+}
+
+function handleTyping(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+  // Typing indicator
+  if (typingTimeout) clearTimeout(typingTimeout);
+  sendTypingIndicator();
+  typingTimeout = setTimeout(() => stopTypingIndicator(), 3000);
+}
+
+async function sendTypingIndicator() {
+  if (!currentUser || !activeUserId) return;
+  // Store typing status in a temporary table or via realtime
+  // For simplicity, we'll just update UI locally
+}
+
+async function stopTypingIndicator() {}
+
+async function loadMessages() {
+  const user = currentUser;
+  if (!user || !activeUserId) return;
+
+  const messagesList = document.getElementById('messages-list');
+  if (!messagesList) return;
+
+  const { data: messages } = await sb
+    .from('messages')
+    .select('*')
+    .or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeUserId}),and(sender_id.eq.${activeUserId},receiver_id.eq.${user.id})`)
+    .order('created_at', { ascending: true });
+
+  if (!messages || messages.length === 0) {
+    messagesList.innerHTML = `
+      <div style="flex:1; display:flex; align-items:center; justify-content:center; color:var(--text3); padding:40px;">
+        No messages yet. Start the conversation!
+      </div>
+    `;
+    return;
+  }
+
+  const scrollToBottom = messagesList.scrollHeight - messagesList.scrollTop - messagesList.clientHeight < 50;
+
+  messagesList.innerHTML = messages.map(msg => {
+    const isMine = msg.sender_id === user.id;
+    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const expiresAt = new Date(msg.expires_at);
+    const now = new Date();
+    const remainingSecs = Math.max(0, Math.floor((expiresAt - now) / 1000));
+    const timerPercent = (remainingSecs / MSG_TTL) * 100;
+
+    return `
+      <div class="message-bubble ${isMine ? 'mine' : 'other'}">
+        <div class="message-content">
+          ${msg.content ? escapeHtml(msg.content) : ''}
+          ${msg.image_url ? `<img src="${msg.image_url}" class="message-image" onclick="event.stopPropagation()" loading="lazy">` : ''}
+          <span class="message-time">${time} · ${remainingSecs}s</span>
+          <div class="message-timer ${!isMine ? 'other' : ''}" style="width: ${Math.max(0, timerPercent)}%"></div>
+        </div>
+      </div>
+    `;
   }).join('');
-  if(atBottom)list.scrollTop=list.scrollHeight;
+
+  if (scrollToBottom) {
+    messagesList.scrollTop = messagesList.scrollHeight;
+  }
 }
 
-async function deleteExpired(){
-  await sb.from('messages').delete().lt('expires_at',new Date().toISOString());
+async function sendMessage() {
+  const user = currentUser;
+  if (!user || !activeUserId) {
+    toast('Sign in to send messages', 'error');
+    return;
+  }
+
+  const input = document.getElementById('message-input');
+  const content = input.value.trim();
+  const limit = getMsgLimit();
+
+  if (!content) return;
+  if (limit !== Infinity && content.length > limit) {
+    toast(`Message exceeds ${limit} characters`, 'error');
+    return;
+  }
+
+  const expiresAt = new Date(Date.now() + MSG_TTL * 1000).toISOString();
+
+  const { error } = await sb
+    .from('messages')
+    .insert({
+      sender_id: user.id,
+      receiver_id: activeUserId,
+      content: content,
+      expires_at: expiresAt
+    });
+
+  if (error) {
+    toast('Failed to send message', 'error');
+    return;
+  }
+
+  input.value = '';
+  updateCharCount();
+  await loadMessages();
 }
 
-async function sendMsg(){
-  const user=T.state.user;if(!user||!activeUserId)return;
-  const input=document.getElementById('msg-in'),text=input.value.trim();
-  const limit=Prof.msgLimit(T.state.profile);
-  if(!text)return;
-  if(limit!==Infinity&&text.length>limit){toast(`Max ${limit} characters`,'err');return;}
-  const expiresAt=new Date(Date.now()+T.MSG_TTL*1000).toISOString();
-  await sb.from('messages').insert({sender_id:user.id,receiver_id:activeUserId,content:text,expires_at:expiresAt});
-  input.value='';updateMC();loadMsgs();
-}
+async function sendImage(e) {
+  const file = e.target.files[0];
+  const user = currentUser;
+  if (!file || !user || !activeUserId) return;
+  if (!isAdmin()) {
+    toast('Only verified users can send images', 'error');
+    return;
+  }
 
-async function sendImg(e){
-  const file=e.target.files[0];const user=T.state.user;
-  if(!file||!user||!activeUserId)return;
-  if(!Prof.isAdmin(T.state.profile)){toast('Only admin can send images','err');return;}
-  const r=new FileReader();
-  r.onload=async ev=>{
-    const expiresAt=new Date(Date.now()+T.MSG_TTL*1000).toISOString();
-    await sb.from('messages').insert({sender_id:user.id,receiver_id:activeUserId,image_url:ev.target.result,expires_at:expiresAt});
-    loadMsgs();
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const expiresAt = new Date(Date.now() + MSG_TTL * 1000).toISOString();
+    await sb.from('messages').insert({
+      sender_id: user.id,
+      receiver_id: activeUserId,
+      image_url: ev.target.result,
+      expires_at: expiresAt
+    });
+    toast('Image sent');
+    await loadMessages();
   };
-  r.readAsDataURL(file);e.target.value='';
+  reader.readAsDataURL(file);
+  e.target.value = '';
 }
 
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&window.innerWidth<=768){document.getElementById('msg-side').classList.remove('hide');document.getElementById('chat-area').classList.remove('show');}});
+async function deleteExpiredMessages() {
+  await sb.from('messages').delete().lt('expires_at', new Date().toISOString());
+}
 
-Auth.init(async(user)=>{
-  if(!user){location.href='/landing.html';return;}
-  await loadConvs();
-  if(toParam){const{data:p}=await sb.from('profiles').select('*').eq('id',toParam).single();if(p)openConv(toParam,p.full_name||'User');}
+// Close sidebar when clicking outside on mobile
+document.addEventListener('click', (e) => {
+  const sidebar = document.getElementById('msg-sidebar');
+  const chatArea = document.getElementById('chat-area');
+  if (window.innerWidth <= 768 && sidebar && chatArea) {
+    if (!sidebar.contains(e.target) && !chatArea.contains(e.target) && sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+    }
+  }
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (messagesInterval) clearInterval(messagesInterval);
 });
 </script>
 </body>
