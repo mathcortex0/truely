@@ -1,35 +1,62 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Truely - Notifications">
-  <title>Truely — Notifications</title>
-  <link rel="stylesheet" href="/css/style.css">
-</head>
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Notifications</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
 <body>
-  <div id="nav-placeholder"></div>
-  
-  <main class="page-wrap">
-    <div class="container">
-      <div class="profile-header" style="padding: var(--spacing-md);">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h1 style="font-size: 1.5rem;">Notifications</h1>
-          <button id="mark-all-read" class="btn btn-sm btn-secondary">Mark all read</button>
-        </div>
-      </div>
-      <div id="notifications-list"></div>
-    </div>
-  </main>
-  
-  <div id="toast-container" class="toast-container"></div>
+<div id="_nav" data-page="notifs"></div>
+<div class="page-root"><div class="center-wrap" style="border-left:1px solid var(--border);border-right:1px solid var(--border)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)">
+  <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px">Notifications</span>
+  <button class="btn-ghost btn-sm" onclick="markAll()">Mark all read</button>
+</div>
+<div id="notifs-list"></div>
+</div></div>
+<div class="toast" id="_toast"></div>
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent=CSS;
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/config.js"></script>
-  <script src="/js/utils.js"></script>
-  <script src="/js/state.js"></script>
-  <script src="/js/auth.js"></script>
-  <script src="/js/components.js"></script>
-  <script src="/js/notifications.js"></script>
+async function loadNotifs(){
+  const user=T.state.user,list=document.getElementById('notifs-list');
+  if(!user){list.innerHTML='<div class="empty">Sign in to see notifications</div>';return;}
+  list.innerHTML=`<div style="padding:32px;text-align:center"><div class="spinner"></div></div>`;
+  const{data:notifs}=await sb.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(50);
+  if(!notifs||!notifs.length){list.innerHTML='<div class="empty"><div class="empty-icon">🔔</div><p>No notifications yet</p></div>';return;}
+  const ids=[...new Set(notifs.map(n=>n.from_user_id).filter(Boolean))];
+  const pm={};
+  if(ids.length){const{data:profs}=await sb.from('profiles').select('*').in('id',ids);(profs||[]).forEach(p=>pm[p.id]=p);}
+  list.innerHTML=notifs.map(n=>{
+    const from=pm[n.from_user_id],name=from?.full_name||'Someone',av=from?.avatar_url;
+    const ring=Prof.ring(from),badge=Prof.badge(from);
+    let icon='',iconCls='',text='';
+    if(n.type==='like'){icon='❤️';iconCls='ni-like';text='liked your post';}
+    else if(n.type==='comment'){icon='💬';iconCls='ni-cmt';text='replied to your post';}
+    else if(n.type==='follow'){icon='👤';iconCls='ni-follow';text='started following you';}
+    else if(n.type==='repost'){icon='🔁';iconCls='ni-rep';text='reposted your post';}
+    else{icon='📢';iconCls='ni-cmt';text=n.message||'sent you a notification';}
+    const href=n.post_id?`/post.html?id=${n.post_id}`:`/profile.html?id=${n.from_user_id}`;
+    return `<div class="notif${n.is_read?'':' unread'}" id="n-${n.id}" onclick="location.href='${href}';markOne(${n.id})">
+      <div class="notif-icon ${iconCls}">${icon}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex:1">
+        <div class="av av-sm${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
+        <div class="notif-text"><b>${esc(name)}</b>${badge} ${text}<div class="notif-time">${ago(n.created_at)}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+  await sb.from('notifications').update({is_read:true}).eq('user_id',user.id).eq('is_read',false);
+  document.querySelectorAll('[id^="ndot"]').forEach(el=>el.style.display='none');
+}
+
+async function markOne(id){await sb.from('notifications').update({is_read:true}).eq('id',id);document.getElementById(`n-${id}`)?.classList.remove('unread');}
+async function markAll(){
+  const user=T.state.user;if(!user)return;
+  await sb.from('notifications').update({is_read:true}).eq('user_id',user.id);
+  document.querySelectorAll('.notif.unread').forEach(el=>el.classList.remove('unread'));
+  toast('All marked as read');
+}
+
+Auth.init(()=>loadNotifs());
+setTimeout(()=>{if(!T.state.user)loadNotifs();},400);
+</script>
 </body>
 </html>
