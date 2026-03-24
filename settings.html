@@ -1,134 +1,382 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Settings</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="description" content="Truely — Account Settings"/>
+<title>Truely — Settings</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="shared-css"></style>
+<style>
+.settings-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.settings-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  font-family: var(--serif);
+}
+.settings-field {
+  margin-bottom: 16px;
+}
+.settings-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text2);
+}
+.settings-field input, .settings-field textarea {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  outline: none;
+}
+.settings-field input:focus, .settings-field textarea:focus {
+  border-color: var(--blue);
+}
+.avatar-settings {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.avatar-settings .avatar {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.avatar-settings .avatar:hover { opacity: 0.8; }
+.verify-card {
+  background: rgba(29,155,240,0.08);
+  border: 1px solid rgba(29,155,240,0.2);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 16px 0;
+  text-align: center;
+}
+.verify-price {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--blue);
+}
+.danger-zone {
+  border-color: var(--red);
+}
+.danger-btn {
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.danger-btn:hover {
+  background: rgba(244,33,46,0.1);
+}
+</style>
+</head>
 <body>
-<div id="_nav" data-page="home"></div>
-<div class="page-root"><div class="settings-wrap">
-<h1 style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;margin-bottom:20px">Settings</h1>
+<div id="nav-ph"></div>
+<div id="bn-ph"></div>
 
-<!-- PROFILE SECTION -->
-<div class="settings-section">
-  <div class="settings-title">Profile</div>
-  <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
-    <div class="av av-xl" id="settings-av" style="cursor:pointer" onclick="document.getElementById('av-settings-file').click()">T</div>
-    <div>
-      <div style="font-weight:600;font-size:14px">Profile photo</div>
-      <div style="font-size:13px;color:var(--sub);margin-top:2px">Click photo to change</div>
+<div class="page-wrap">
+  <div class="settings-container">
+    <h1 style="font-size: 24px; font-weight: 800; font-family: var(--serif); margin-bottom: 20px;">Settings</h1>
+
+    <!-- Profile Section -->
+    <div class="settings-section">
+      <div class="section-title">Profile Information</div>
+      <div class="avatar-settings">
+        <div class="avatar av-xl" id="settings-avatar" onclick="document.getElementById('avatar-file').click()"></div>
+        <div>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('avatar-file').click()">Change photo</button>
+          <input type="file" id="avatar-file" accept="image/*" style="display:none" onchange="uploadAvatarSettings(event)">
+          <p style="font-size: 12px; color: var(--text3); margin-top: 8px;">Click to upload new profile picture</p>
+        </div>
+      </div>
+      <div class="settings-field">
+        <label>Display Name</label>
+        <input type="text" id="settings-name" maxlength="50">
+      </div>
+      <div class="settings-field">
+        <label>Username</label>
+        <input type="text" id="settings-username" maxlength="20" placeholder="@username">
+        <div id="username-status" style="font-size: 12px; margin-top: 4px;"></div>
+      </div>
+      <div class="settings-field">
+        <label>Bio</label>
+        <textarea id="settings-bio" rows="3" maxlength="160"></textarea>
+        <div id="bio-count" style="font-size: 12px; color: var(--text3); text-align: right;"></div>
+      </div>
+      <div class="settings-field">
+        <label>Website</label>
+        <input type="url" id="settings-website" placeholder="https://yourwebsite.com">
+      </div>
+      <div class="settings-field">
+        <label>Location</label>
+        <input type="text" id="settings-location" placeholder="City, Country">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveProfileSettings()">Save Changes</button>
     </div>
-    <input type="file" id="av-settings-file" accept="image/*" style="display:none" onchange="updateAv(event)"/>
+
+    <!-- Password Section -->
+    <div class="settings-section">
+      <div class="section-title">Change Password</div>
+      <div class="settings-field">
+        <label>New Password</label>
+        <input type="password" id="new-password" placeholder="Min 6 characters">
+      </div>
+      <div class="settings-field">
+        <label>Confirm Password</label>
+        <input type="password" id="confirm-password" placeholder="Confirm new password">
+      </div>
+      <div id="password-status" class="msg" style="display:none"></div>
+      <button class="btn btn-outline btn-full" onclick="changePassword()">Update Password</button>
+    </div>
+
+    <!-- Verification Section -->
+    <div class="settings-section" id="verify-section">
+      <div class="section-title">Get Verified</div>
+      <p style="margin-bottom: 12px;">Get a blue verified badge and expanded features:</p>
+      <ul style="margin-left: 20px; margin-bottom: 16px; color: var(--text2);">
+        <li>✓ Blue verification badge on your profile</li>
+        <li>✓ 600 character posts (instead of 280)</li>
+        <li>✓ 400 character messages</li>
+        <li>✓ Priority support</li>
+      </ul>
+      <div class="verify-card">
+        <div class="verify-price">৳99 / month</div>
+        <p style="font-size: 13px; margin: 8px 0;">Pay via Bkash / Nagad</p>
+        <p style="font-family: monospace; font-size: 18px; font-weight: bold;">01XXXXXXXXX</p>
+        <p style="font-size: 12px;">Contact admin after payment: <a href="${VERIFY_LINK}" target="_blank" style="color: var(--blue);">@admin</a></p>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="window.location.href='${VERIFY_LINK}'">Contact Admin to Verify</button>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="settings-section danger-zone">
+      <div class="section-title" style="color: var(--red);">Danger Zone</div>
+      <p style="margin-bottom: 16px;">Permanently delete your account and all associated data. This action cannot be undone.</p>
+      <button class="danger-btn" onclick="deleteAccount()">Delete Account</button>
+    </div>
   </div>
-  <div class="field"><label>Display Name</label><input id="s-name" type="text" placeholder="Your name"/></div>
-  <div class="field"><label>Bio</label><textarea id="s-bio" rows="3" placeholder="Tell people about yourself..."></textarea></div>
-  <div class="field"><label>Website</label><input id="s-web" type="url" placeholder="https://yoursite.com"/></div>
-  <div class="field"><label>Location</label><input id="s-loc" type="text" placeholder="Where are you?"/></div>
-  <div class="ok-msg" id="prof-ok"></div>
-  <button class="btn-pri" onclick="saveProfile()">Save changes</button>
 </div>
 
-<!-- PASSWORD SECTION -->
-<div class="settings-section">
-  <div class="settings-title">Change Password</div>
-  <div class="field"><label>New Password</label><input id="s-pass" type="password" placeholder="New password (min 6 chars)"/></div>
-  <div class="field"><label>Confirm Password</label><input id="s-pass2" type="password" placeholder="Confirm new password"/></div>
-  <div class="err-msg" id="pass-err"></div>
-  <div class="ok-msg" id="pass-ok"></div>
-  <button class="btn-pri" onclick="changePass()">Update password</button>
-</div>
+<div class="toast" id="toast"></div>
 
-<!-- VERIFIED SECTION -->
-<div class="settings-section" id="verify-section">
-  <div class="settings-title">Get Verified</div>
-  <p style="font-size:14px;color:var(--sub);margin-bottom:14px">Get a blue verified badge and expanded post limit (600 chars).</p>
-  <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:16px;margin-bottom:14px">
-    <div style="font-size:12px;color:var(--sub);margin-bottom:4px">Pay via Bkash / Nagad to:</div>
-    <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--cyan)">01XXXXXXXXX</div>
-    <div style="font-size:13px;color:var(--sub);margin-top:4px">Amount: <b style="color:var(--text)">৳99 / month</b></div>
-  </div>
-  <p style="font-size:13px;color:var(--sub)">After payment, message the admin and your badge will be activated within 24 hours.</p>
-</div>
-
-<!-- DANGER SECTION -->
-<div class="settings-section">
-  <div class="settings-title" style="color:var(--red)">Danger Zone</div>
-  <p style="font-size:14px;color:var(--sub);margin-bottom:14px">Permanently delete your account and all your data.</p>
-  <button class="btn-danger" onclick="deleteAccount()">Delete Account</button>
-</div>
-</div></div>
-<div class="toast" id="_toast"></div>
-<script src="/truely.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/supabase.js"></script>
 <script>
-document.getElementById('_css').textContent=CSS;
+document.getElementById('shared-css').textContent = SHARED_CSS;
+document.getElementById('nav-ph').innerHTML = getNavHTML('');
+document.getElementById('bn-ph').innerHTML = getBottomNavHTML('profile');
 
-function loadSettings(){
-  const p=T.state.profile;if(!p)return;
-  document.getElementById('s-name').value=p.full_name||'';
-  document.getElementById('s-bio').value=p.bio||'';
-  document.getElementById('s-web').value=p.website||'';
-  document.getElementById('s-loc').value=p.location||'';
-  const av=p.avatar_url,ring=Prof.ring(p);
-  const el=document.getElementById('settings-av');
-  el.innerHTML=av?`<img src="${av}"/>`:(p.full_name||'U').charAt(0).toUpperCase();
-  el.className=`av av-xl${ring}`;
+let usernameTimer = null;
+let currentProfile = null;
+
+async function loadSettings() {
+  const user = window.TruelyState.currentUser;
+  if (!user) {
+    window.location.href = '/';
+    return;
+  }
+
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if (!profile) return;
+  currentProfile = profile;
+
+  // Avatar
+  const avEl = document.getElementById('settings-avatar');
+  const isAdmin = profile.is_admin || profile.email === ADMIN_EMAIL;
+  const isVerified = profile.is_verified;
+  const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+  if (profile.avatar_url) {
+    avEl.innerHTML = `<img src="${profile.avatar_url}">`;
+  } else {
+    avEl.innerHTML = `<span>${(profile.full_name || 'U')[0].toUpperCase()}</span>`;
+  }
+  avEl.className = `avatar av-xl ${ring}`;
+
+  document.getElementById('settings-name').value = profile.full_name || '';
+  document.getElementById('settings-username').value = profile.username || '';
+  document.getElementById('settings-bio').value = profile.bio || '';
+  document.getElementById('settings-website').value = profile.website || '';
+  document.getElementById('settings-location').value = profile.location || '';
+
+  document.getElementById('bio-count').textContent = `${(profile.bio || '').length}/160`;
+
   // Hide verify section if already verified or admin
-  if(Prof.isAdmin(p)||p.is_verified)document.getElementById('verify-section').style.display='none';
+  if (isAdmin || isVerified) {
+    document.getElementById('verify-section').style.display = 'none';
+  }
 }
 
-async function saveProfile(){
-  const user=T.state.user;if(!user)return;
-  const name=document.getElementById('s-name').value.trim();
-  const bio=document.getElementById('s-bio').value.trim();
-  const website=document.getElementById('s-web').value.trim();
-  const location=document.getElementById('s-loc').value.trim();
-  if(!name){toast('Name cannot be empty','err');return;}
-  const{error}=await sb.from('profiles').update({full_name:name,bio,website,location}).eq('id',user.id);
-  if(error){toast('Failed to save','err');return;}
-  T.state.profile.full_name=name;T.state.profile.bio=bio;
-  const ok=document.getElementById('prof-ok');ok.textContent='Profile saved!';ok.className='ok-msg show';
-  setTimeout(()=>ok.className='ok-msg',2500);
-  Nav.render();toast('Saved!');
-}
-
-async function changePass(){
-  const p=document.getElementById('s-pass').value,p2=document.getElementById('s-pass2').value;
-  const err=document.getElementById('pass-err'),ok=document.getElementById('pass-ok');
-  err.className='err-msg';ok.className='ok-msg';
-  if(!p){err.textContent='Enter a new password';err.className='err-msg show';return;}
-  if(p.length<6){err.textContent='Password must be 6+ characters';err.className='err-msg show';return;}
-  if(p!==p2){err.textContent='Passwords do not match';err.className='err-msg show';return;}
-  const{error}=await sb.auth.updateUser({password:p});
-  if(error){err.textContent=error.message;err.className='err-msg show';}
-  else{ok.textContent='Password updated!';ok.className='ok-msg show';document.getElementById('s-pass').value='';document.getElementById('s-pass2').value='';}
-}
-
-async function updateAv(e){
-  const file=e.target.files[0];if(!file)return;
-  const r=new FileReader();
-  r.onload=async ev=>{
-    const url=ev.target.result;
-    await sb.from('profiles').update({avatar_url:url}).eq('id',T.state.user.id);
-    T.state.profile.avatar_url=url;
-    document.getElementById('settings-av').innerHTML=`<img src="${url}"/>`;
-    Nav.render();toast('Photo updated!');
-  };
-  r.readAsDataURL(file);
-}
-
-async function deleteAccount(){
-  if(!confirm('Are you absolutely sure? This cannot be undone.'))return;
-  if(!confirm('All your posts, likes, and data will be permanently deleted.'))return;
-  const user=T.state.user;if(!user)return;
-  await sb.from('posts').delete().eq('author_id',user.id);
-  await sb.from('profiles').delete().eq('id',user.id);
-  await sb.auth.signOut();
-  location.href='/landing.html';
-}
-
-Auth.init((user)=>{
-  if(!user){location.href='/landing.html';return;}
-  loadSettings();
-  if(location.hash==='#verify'){document.getElementById('verify-section').scrollIntoView({behavior:'smooth'});}
+document.getElementById('settings-bio').addEventListener('input', (e) => {
+  document.getElementById('bio-count').textContent = `${e.target.value.length}/160`;
 });
+
+document.getElementById('settings-username').addEventListener('input', () => {
+  clearTimeout(usernameTimer);
+  const val = document.getElementById('settings-username').value.trim().toLowerCase();
+  const status = document.getElementById('username-status');
+  if (!val) {
+    status.innerHTML = '';
+    return;
+  }
+  if (!/^[a-z0-9_]{3,20}$/.test(val)) {
+    status.innerHTML = '<span style="color: var(--red);">3-20 chars, letters/numbers/underscore only</span>';
+    return;
+  }
+  usernameTimer = setTimeout(async () => {
+    if (val === currentProfile.username) {
+      status.innerHTML = '';
+      return;
+    }
+    const { data } = await sb.from('profiles').select('id').eq('username', val).single();
+    if (data) {
+      status.innerHTML = '<span style="color: var(--red);">Username taken</span>';
+    } else {
+      status.innerHTML = '<span style="color: var(--green);">Available</span>';
+    }
+  }, 400);
+});
+
+async function saveProfileSettings() {
+  const user = window.TruelyState.currentUser;
+  if (!user) return;
+
+  const name = document.getElementById('settings-name').value.trim();
+  const username = document.getElementById('settings-username').value.trim().toLowerCase();
+  const bio = document.getElementById('settings-bio').value.trim();
+  const website = document.getElementById('settings-website').value.trim();
+  const location = document.getElementById('settings-location').value.trim();
+
+  if (!name) {
+    toast('Display name is required', 'error');
+    return;
+  }
+
+  const updates = { full_name: name, bio, website, location };
+  if (username && username !== currentProfile.username) {
+    const { data } = await sb.from('profiles').select('id').eq('username', username).single();
+    if (data) {
+      toast('Username taken', 'error');
+      return;
+    }
+    updates.username = username;
+  }
+
+  const { error } = await sb.from('profiles').update(updates).eq('id', user.id);
+  if (error) {
+    toast('Failed to save', 'error');
+    return;
+  }
+
+  toast('Profile updated', 'success');
+  await loadSettings();
+  window.TruelyState.userProfile = { ...window.TruelyState.userProfile, ...updates };
+  updateNavAvatar();
+}
+
+async function uploadAvatarSettings(e) {
+  const file = e.target.files[0];
+  const user = window.TruelyState.currentUser;
+  if (!file || !user) return;
+
+  const ext = file.name.split('.').pop();
+  const path = `${user.id}/avatar.${ext}`;
+  const { error } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+  if (error) {
+    toast('Upload failed', 'error');
+    return;
+  }
+  const { data: { publicUrl } } = sb.storage.from('avatars').getPublicUrl(path);
+  await sb.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+  window.TruelyState.userProfile.avatar_url = publicUrl;
+  updateNavAvatar();
+  await loadSettings();
+  toast('Photo updated', 'success');
+}
+
+async function changePassword() {
+  const newPass = document.getElementById('new-password').value;
+  const confirmPass = document.getElementById('confirm-password').value;
+  const status = document.getElementById('password-status');
+
+  if (!newPass) {
+    status.textContent = 'Enter a new password';
+    status.className = 'msg error';
+    status.style.display = 'block';
+    return;
+  }
+  if (newPass.length < 6) {
+    status.textContent = 'Password must be at least 6 characters';
+    status.className = 'msg error';
+    status.style.display = 'block';
+    return;
+  }
+  if (newPass !== confirmPass) {
+    status.textContent = 'Passwords do not match';
+    status.className = 'msg error';
+    status.style.display = 'block';
+    return;
+  }
+
+  const { error } = await sb.auth.updateUser({ password: newPass });
+  if (error) {
+    status.textContent = error.message;
+    status.className = 'msg error';
+    status.style.display = 'block';
+  } else {
+    status.textContent = 'Password updated successfully!';
+    status.className = 'msg success';
+    status.style.display = 'block';
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-password').value = '';
+    setTimeout(() => status.style.display = 'none', 3000);
+  }
+}
+
+async function deleteAccount() {
+  if (!confirm('Are you absolutely sure? This will permanently delete your account and all your data.')) return;
+  if (!confirm('This action cannot be undone. Type DELETE to confirm.')) return;
+
+  const user = window.TruelyState.currentUser;
+  if (!user) return;
+
+  // Delete all user data
+  await sb.from('posts').delete().eq('author_id', user.id);
+  await sb.from('comments').delete().eq('user_id', user.id);
+  await sb.from('likes').delete().eq('user_id', user.id);
+  await sb.from('follows').delete().eq('follower_id', user.id);
+  await sb.from('follows').delete().eq('following_id', user.id);
+  await sb.from('messages').delete().or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+  await sb.from('notifications').delete().or(`user_id.eq.${user.id},from_user_id.eq.${user.id}`);
+  await sb.from('profiles').delete().eq('id', user.id);
+  await sb.auth.signOut();
+
+  toast('Account deleted');
+  setTimeout(() => window.location.href = '/', 1500);
+}
+
+initSharedAuth(() => loadSettings());
 </script>
 </body>
 </html>
