@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Truely — Say What's Real</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="_css"></style>
+</head>
+<body>
+<div id="_nav" data-page="landing"></div>
+
+<!-- HERO -->
+<div class="page-root">
+<section class="hero" id="hero-section">
+  <div>
+    <div class="hero-inner">
+      <div class="hero-wordmark">Truely</div>
+      <p class="hero-sub">The platform where every voice matters.<br/>Say what's real. Connect with people who listen.</p>
+      <div class="hero-cta">
+        <button class="btn-pri" style="font-size:16px;padding:14px 32px;border-radius:12px" onclick="showAuth('signup')">Create your account</button>
+        <button class="btn-ghost" style="font-size:15px;padding:13px 32px;border-radius:12px" onclick="showAuth('login')">Sign in</button>
+      </div>
+    </div>
+    <!-- AUTH CARD (hidden by default) -->
+    <div id="auth-wrap" style="display:none;margin-top:32px">
+      <div class="auth-card" id="auth-card"></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="feat-grid">
+  <div class="feat">
+    <div class="feat-icon">✓</div>
+    <div class="feat-title">Verified Identities</div>
+    <div class="feat-text">Real people with verified badges. Know who you're reading.</div>
+  </div>
+  <div class="feat">
+    <div class="feat-icon">⏱</div>
+    <div class="feat-title">Ephemeral Messages</div>
+    <div class="feat-text">Private messages vanish after 30 seconds. True privacy by design.</div>
+  </div>
+  <div class="feat">
+    <div class="feat-icon">#</div>
+    <div class="feat-title">Hashtag Discovery</div>
+    <div class="feat-text">Trending topics surface organically. Discover what matters now.</div>
+  </div>
+</section>
+</div>
+
+<div class="toast" id="_toast"></div>
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent = CSS;
+
+function buildNav(){
+  const el=document.getElementById('_nav');
+  el.innerHTML=`<nav class="nav"><div class="nav-inner"><a class="wordmark" href="/landing.html">Truely</a><div class="nav-right"><button class="icon-btn theme-toggle" onclick="Theme.toggle()"><span class="theme-icon">☀️</span></button><button class="btn-ghost btn-sm" onclick="showAuth('login')">Sign in</button><button class="btn-pri btn-sm" onclick="showAuth('signup')">Join</button></div></div></nav>`;
+  Theme.init();
+}
+buildNav();
+
+function showAuth(mode){
+  const wrap=document.getElementById('auth-wrap'),card=document.getElementById('auth-card');
+  wrap.style.display='block';
+  document.getElementById('hero-section').scrollIntoView({behavior:'smooth'});
+  if(mode==='signup'){
+    card.innerHTML=`<div class="auth-logo">Truely</div><p class="auth-sub">Join the conversation</p>
+    <div class="err-msg" id="su-err"></div><div class="ok-msg" id="su-ok"></div>
+    <div class="field"><label>Full Name</label><input id="su-n" type="text" placeholder="Your name"/></div>
+    <div class="field"><label>Email</label><input id="su-e" type="email" placeholder="email@example.com"/></div>
+    <div class="field"><label>Password</label><input id="su-p" type="password" placeholder="Min 6 characters"/></div>
+    <button class="btn-pri btn-full" onclick="doSignUp()">Create Account</button>
+    <div class="or-line">or</div>
+    <button class="btn-google" onclick="googleAuth()"><img src="https://www.google.com/favicon.ico" width="18"/> Continue with Google</button>
+    <div class="auth-switch">Already on Truely? <a onclick="showAuth('login')">Sign in</a></div>`;
+  } else {
+    card.innerHTML=`<div class="auth-logo">Truely</div><p class="auth-sub">Welcome back</p>
+    <div class="err-msg" id="li-err"></div>
+    <div class="field"><label>Email</label><input id="li-e" type="email" placeholder="email@example.com"/></div>
+    <div class="field"><label>Password</label><input id="li-p" type="password" placeholder="Your password"/></div>
+    <button class="btn-pri btn-full" onclick="doSignIn()">Sign In</button>
+    <div class="or-line">or</div>
+    <button class="btn-google" onclick="googleAuth()"><img src="https://www.google.com/favicon.ico" width="18"/> Continue with Google</button>
+    <div class="auth-switch">New to Truely? <a onclick="showAuth('signup')">Join now</a></div>`;
+  }
+  if(window.location.hash==='#signup')showAuth('signup');
+}
+
+async function googleAuth(){
+  await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin}});
+}
+async function doSignUp(){
+  const n=document.getElementById('su-n').value.trim(),e=document.getElementById('su-e').value.trim(),p=document.getElementById('su-p').value;
+  const err=document.getElementById('su-err'),ok=document.getElementById('su-ok');
+  err.className='err-msg';ok.className='ok-msg';
+  if(!n||!e||!p){err.textContent='Please fill all fields';err.className='err-msg show';return;}
+  if(p.length<6){err.textContent='Password must be 6+ characters';err.className='err-msg show';return;}
+  const{error}=await sb.auth.signUp({email:e,password:p,options:{data:{full_name:n}}});
+  if(error){err.textContent=error.message;err.className='err-msg show';}
+  else{ok.textContent='Account created! Check your email to verify, then sign in.';ok.className='ok-msg show';}
+}
+async function doSignIn(){
+  const e=document.getElementById('li-e').value.trim(),p=document.getElementById('li-p').value;
+  const err=document.getElementById('li-err');
+  err.className='err-msg';
+  if(!e||!p){err.textContent='Please fill all fields';err.className='err-msg show';return;}
+  const{data,error}=await sb.auth.signInWithPassword({email:e,password:p});
+  if(error){err.textContent='Wrong email or password';err.className='err-msg show';}
+  else{window.location.href='/';}
+}
+
+// Check if already logged in
+(async()=>{
+  const{data:{session}}=await sb.auth.getSession();
+  if(session?.user)window.location.href='/';
+  if(location.hash==='#signup')showAuth('signup');
+  else if(location.hash==='#login')showAuth('login');
+})();
+</script>
+</body>
+</html>
