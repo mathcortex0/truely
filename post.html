@@ -1,139 +1,383 @@
-<!-- POST.HTML -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Post</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="description" content="Truely — Post"/>
+<title>Truely — Post</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="shared-css"></style>
+<style>
+.back-header {
+  position: sticky;
+  top: 53px;
+  z-index: 80;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back-btn:hover { background: var(--hover); }
+.post-detail {
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+}
+.post-stats {
+  display: flex;
+  gap: 20px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text3);
+}
+.post-stats span strong { color: var(--text); }
+.comment-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.comment-section input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+.comment-section input:focus { border-color: var(--blue); }
+.comment-list {
+  padding: 0;
+}
+.comment-item {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  animation: fadeUp 0.2s ease;
+}
+.comment-bubble {
+  flex: 1;
+}
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.comment-name {
+  font-weight: 700;
+  font-size: 13px;
+}
+.comment-time {
+  font-size: 11px;
+  color: var(--text3);
+}
+.comment-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text2);
+}
+.comment-del {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.comment-item:hover .comment-del { opacity: 1; }
+.comment-del:hover { color: var(--red); }
+</style>
+</head>
 <body>
-<div id="_nav" data-page="home"></div>
-<div class="page-root"><div class="center-wrap">
-<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="history.back()">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-  <span style="font-weight:600;font-size:15px">Back</span>
-</div>
-<div id="post-wrap" style="border-bottom:1px solid var(--border)"></div>
-<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
-  <div style="display:flex;gap:10px;align-items:center">
-    <div class="av av-sm" id="cmt-av-post">T</div>
-    <input style="flex:1;padding:10px 14px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;" id="cmt-in" placeholder="Post your reply..." onkeydown="if(event.key==='Enter')submitCmt()"/>
-    <button class="btn-pri btn-sm" onclick="submitCmt()">Reply</button>
+<div id="nav-ph"></div>
+<div id="bn-ph"></div>
+
+<div class="page-wrap">
+  <div class="main-wrap">
+    <div class="back-header">
+      <button class="back-btn" onclick="history.back()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </button>
+      <span style="font-weight: 600;">Post</span>
+    </div>
+    <div id="post-container">
+      <div style="padding: 32px; text-align: center;"><div class="skeleton" style="height: 120px;"></div></div>
+    </div>
+    <div id="comments-container"></div>
   </div>
 </div>
-<div id="cmts-wrap"></div>
-</div></div>
-<div class="toast" id="_toast"></div>
-<script src="/truely.js"></script>
-<script>
-document.getElementById('_css').textContent=CSS;
-const pid=new URLSearchParams(location.search).get('id');
 
-async function loadPost(){
-  const{data:p}=await sb.from('posts').select('*').eq('id',pid).single();
-  if(!p){document.getElementById('post-wrap').innerHTML='<div class="empty">Post not found</div>';return;}
-  const{data:prof}=await sb.from('profiles').select('*').eq('id',p.author_id).single();
-  const user=T.state.user;
-  let liked=false;
-  if(user){const{data:l}=await sb.from('likes').select('id').eq('post_id',pid).eq('user_id',user.id).single();liked=!!l;}
-  const name=prof?.full_name||'User',av=prof?.avatar_url;
-  const ring=Prof.ring(prof),badge=Prof.badge(prof);
-  const canDel=user?.email===T.ADMIN||user?.id===p.author_id;
-  const hf=liked?'var(--red)':'none',hs=liked?'var(--red)':'currentColor';
-  document.getElementById('post-wrap').innerHTML=`
-    <div style="padding:16px">
-      <div style="display:flex;gap:12px;margin-bottom:12px">
-        <div class="av av-md${ring}" onclick="location.href='/profile.html?id=${p.author_id}'" style="cursor:pointer">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
-        <div>
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;display:flex;align-items:center;gap:4px;cursor:pointer" onclick="location.href='/profile.html?id=${p.author_id}'">${esc(name)}${badge}</div>
-          <div style="font-size:13px;color:var(--sub)">${new Date(p.created_at).toLocaleString()}</div>
-        </div>
-      </div>
-      ${p.content?`<div style="font-size:18px;line-height:1.7;margin-bottom:12px;white-space:pre-wrap;word-break:break-word">${linkHashtags(p.content)}</div>`:''}
-      ${p.image_url?`<img src="${p.image_url}" style="border-radius:12px;width:100%;max-height:500px;object-fit:cover;margin-bottom:12px;border:1px solid var(--border)"/>`:''}
-      <div style="display:flex;gap:16px;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:13px;color:var(--sub)">
-        <span><b style="color:var(--text)">${fmt(p.like_count||0)}</b> likes</span>
-        <span><b style="color:var(--text)">${fmt(p.comment_count||0)}</b> replies</span>
-        <span><b style="color:var(--text)">${fmt(p.repost_count||0)}</b> reposts</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:4px;padding-top:4px">
-        <button class="act act-like${liked?' on':''}" id="lb" onclick="doLike(${liked})">
-          <svg viewBox="0 0 24 24" fill="${hf}" stroke="${hs}" stroke-width="2" width="20" height="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-          <span id="lc-post">${fmt(p.like_count||0)}</span>
-        </button>
-        <button class="act act-share" onclick="doShare()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-        </button>
-        ${canDel?`<button class="act act-del" onclick="doDelete()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`:''}
-      </div>
-    </div>`;
-  loadCmts();
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/supabase.js"></script>
+<script>
+document.getElementById('shared-css').textContent = SHARED_CSS;
+document.getElementById('nav-ph').innerHTML = getNavHTML('');
+document.getElementById('bn-ph').innerHTML = getBottomNavHTML('');
+
+const urlParams = new URLSearchParams(window.location.search);
+const postId = urlParams.get('id');
+
+if (!postId) {
+  window.location.href = '/';
 }
 
-async function loadCmts(){
-  const{data:cmts}=await sb.from('comments').select('*').eq('post_id',pid).order('created_at',{ascending:true});
-  if(!cmts||!cmts.length){document.getElementById('cmts-wrap').innerHTML='<div class="empty" style="padding:32px">No replies yet</div>';return;}
-  const ids=[...new Set(cmts.map(c=>c.user_id))];
-  const{data:profs}=await sb.from('profiles').select('*').in('id',ids);
-  const pm={};(profs||[]).forEach(p=>pm[p.id]=p);
-  const user=T.state.user;
-  document.getElementById('cmts-wrap').innerHTML=cmts.map(c=>{
-    const pr=pm[c.user_id],name=pr?.full_name||'User',av=pr?.avatar_url;
-    const ring=Prof.ring(pr),badge=Prof.badge(pr);
-    const canDel=user?.email===T.ADMIN||user?.id===c.user_id;
-    return `<div class="cmt-item" id="c-${c.id}">
-      <div class="av av-sm${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
-      <div class="cmt-bubble">
-        <div class="cmt-meta"><span class="cmt-name">${esc(name)}${badge}</span><span class="cmt-time">· ${ago(c.created_at)}</span>${canDel?`<button class="cmt-del" onclick="delCmt(${c.id})">✕</button>`:''}</div>
-        <div class="cmt-text">${esc(c.content)}</div>
+async function loadPost() {
+  const { data: post, error } = await sb
+    .from('posts')
+    .select(`*, profiles!posts_author_id_fkey(id, full_name, email, avatar_url, is_verified, is_admin)`)
+    .eq('id', postId)
+    .single();
+
+  if (error || !post) {
+    document.getElementById('post-container').innerHTML = '<div class="empty-state"><p>Post not found</p></div>';
+    return;
+  }
+
+  const profile = post.profiles;
+  const user = window.TruelyState.currentUser;
+  const isAdmin = profile?.is_admin || profile?.email === ADMIN_EMAIL;
+  const isVerified = profile?.is_verified;
+  const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+  let badgeHtml = '';
+  if (isAdmin) badgeHtml = adminBadge();
+  else if (isVerified) badgeHtml = verifiedBadge();
+  const avHTML = profile?.avatar_url ? `<img src="${profile.avatar_url}">` : `<span>${(profile?.full_name || 'U')[0].toUpperCase()}</span>`;
+
+  // Check if user liked this post
+  let liked = false;
+  if (user) {
+    const { data: likeData } = await sb.from('likes').select('id').eq('post_id', postId).eq('user_id', user.id).single();
+    liked = !!likeData;
+  }
+
+  const canDel = user?.id === post.author_id || isAdmin();
+
+  document.getElementById('post-container').innerHTML = `
+    <div class="post-detail">
+      <div style="display: flex; gap: 12px;">
+        <div class="avatar av-md ${ring}" onclick="window.location.href='/profile.html?id=${profile?.id}'" style="cursor:pointer">${avHTML}</div>
+        <div style="flex:1;">
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span class="post-name" style="font-weight:700; font-size:16px; cursor:pointer" onclick="window.location.href='/profile.html?id=${profile?.id}'">${escapeHtml(profile?.full_name || 'User')}</span>
+            ${badgeHtml}
+            <span style="font-size:13px; color:var(--text3)">· ${timeAgo(post.created_at)}</span>
+          </div>
+          ${post.content ? `<div style="font-size: 16px; line-height: 1.6; margin-top: 12px; white-space: pre-wrap;">${escapeHtml(post.content).replace(/#([a-zA-Z][a-zA-Z0-9_]*)/g, '<a onclick="event.stopPropagation();window.location.href=\'/search.html?q=%23$1\'" style="color:var(--blue);cursor:pointer">#$1</a>')}</div>` : ''}
+          ${post.image_url ? `<img src="${post.image_url}" style="width:100%; border-radius: 16px; margin-top: 12px;" loading="lazy">` : ''}
+        </div>
       </div>
-    </div>`;
+    </div>
+    <div class="post-stats">
+      <span><strong>${fmtCount(post.like_count || 0)}</strong> likes</span>
+      <span><strong>${fmtCount(post.comment_count || 0)}</strong> replies</span>
+      <span><strong>${fmtCount(post.repost_count || 0)}</strong> reposts</span>
+      <span><strong>${fmtCount(post.view_count || 0)}</strong> views</span>
+    </div>
+    <div style="display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border);">
+      <button class="act like ${liked ? 'liked' : ''}" id="like-btn" onclick="toggleLike()" style="display:flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" fill="${liked ? 'var(--red)' : 'none'}" stroke="currentColor" stroke-width="2" width="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span id="like-count">${fmtCount(post.like_count || 0)}</span>
+      </button>
+      <button class="act comment" onclick="document.getElementById('comment-input').focus()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>${fmtCount(post.comment_count || 0)}</span>
+      </button>
+      <button class="act share" onclick="sharePost()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      </button>
+      ${canDel ? `<button class="act" style="color:var(--red)" onclick="deletePost()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>` : ''}
+    </div>
+  `;
+
+  await loadComments();
+}
+
+async function toggleLike() {
+  const user = window.TruelyState.currentUser;
+  if (!user) {
+    toast('Sign in to like', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('like-btn');
+  const countSpan = document.getElementById('like-count');
+  const isLiked = btn.classList.contains('liked');
+  let count = parseInt(countSpan.textContent) || 0;
+
+  if (isLiked) {
+    await sb.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
+    btn.classList.remove('liked');
+    btn.querySelector('svg').setAttribute('fill', 'none');
+    countSpan.textContent = fmtCount(Math.max(0, count - 1));
+  } else {
+    await sb.from('likes').insert({ post_id: postId, user_id: user.id });
+    btn.classList.add('liked');
+    btn.querySelector('svg').setAttribute('fill', 'var(--red)');
+    countSpan.textContent = fmtCount(count + 1);
+    // Notification
+    const { data: post } = await sb.from('posts').select('author_id').eq('id', postId).single();
+    if (post && post.author_id !== user.id) {
+      await sb.from('notifications').insert({ user_id: post.author_id, from_user_id: user.id, type: 'like', post_id: postId });
+    }
+  }
+}
+
+async function loadComments() {
+  const { data: comments } = await sb
+    .from('comments')
+    .select(`*, profiles!comments_user_id_fkey(id, full_name, avatar_url, is_verified, is_admin, email)`)
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true });
+
+  const container = document.getElementById('comments-container');
+  const user = window.TruelyState.currentUser;
+
+  container.innerHTML = `
+    <div class="comment-section">
+      <div class="avatar av-xs" id="comment-av"></div>
+      <input type="text" id="comment-input" placeholder="Post your reply..." onkeydown="if(event.key==='Enter') submitComment()">
+      <button class="send-btn" style="width:36px;height:36px;" onclick="submitComment()"><svg viewBox="0 0 24 24" fill="white" width="16"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg></button>
+    </div>
+    <div class="comment-list" id="comment-list"></div>
+  `;
+
+  // Set comment avatar
+  if (user) {
+    const p = window.TruelyState.userProfile;
+    const avEl = document.getElementById('comment-av');
+    if (avEl) {
+      avEl.innerHTML = p?.avatar_url ? `<img src="${p.avatar_url}">` : `<span>${(p?.full_name || 'U')[0].toUpperCase()}</span>`;
+      avEl.className = `avatar av-xs ${p?.is_admin ? 'admin-ring' : p?.is_verified ? 'verified-ring' : ''}`;
+    }
+  }
+
+  const list = document.getElementById('comment-list');
+  if (!comments || comments.length === 0) {
+    list.innerHTML = '<div style="padding: 32px; text-align: center; color: var(--text3);">No replies yet. Be the first!</div>';
+    return;
+  }
+
+  list.innerHTML = comments.map(comment => {
+    const profile = comment.profiles;
+    const name = profile?.full_name || 'User';
+    const isAdmin = profile?.is_admin || profile?.email === ADMIN_EMAIL;
+    const isVerified = profile?.is_verified;
+    const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+    let badgeHtml = '';
+    if (isAdmin) badgeHtml = adminBadge(12);
+    else if (isVerified) badgeHtml = verifiedBadge(12);
+    const avHTML = profile?.avatar_url ? `<img src="${profile.avatar_url}">` : `<span>${(name[0] || 'U').toUpperCase()}</span>`;
+    const canDel = user?.id === comment.user_id || isAdmin();
+
+    return `
+      <div class="comment-item" id="comment-${comment.id}">
+        <div class="avatar av-xs ${ring}" onclick="window.location.href='/profile.html?id=${profile?.id}'" style="cursor:pointer">${avHTML}</div>
+        <div class="comment-bubble">
+          <div class="comment-meta">
+            <span class="comment-name" onclick="window.location.href='/profile.html?id=${profile?.id}'" style="cursor:pointer">${escapeHtml(name)}</span>${badgeHtml}
+            <span class="comment-time">· ${timeAgo(comment.created_at)}</span>
+            ${canDel ? `<button class="comment-del" onclick="deleteComment('${comment.id}')">✕</button>` : ''}
+          </div>
+          <div class="comment-text">${escapeHtml(comment.content)}</div>
+        </div>
+      </div>
+    `;
   }).join('');
 }
 
-async function submitCmt(){
-  const user=T.state.user;if(!user){location.href='/landing.html';return;}
-  const input=document.getElementById('cmt-in'),text=input.value.trim();
-  if(!text)return;
-  await sb.from('comments').insert({post_id:parseInt(pid),user_id:user.id,content:text});
-  input.value='';
-  loadCmts();
-}
+async function submitComment() {
+  const user = window.TruelyState.currentUser;
+  if (!user) {
+    toast('Sign in to comment', 'error');
+    return;
+  }
 
-async function doLike(liked){
-  const user=T.state.user;if(!user){location.href='/landing.html';return;}
-  const btn=document.getElementById('lb'),el=document.getElementById('lc-post');
-  const n=parseInt(el.textContent)||0,path=btn.querySelector('path');
-  if(liked){
-    await sb.from('likes').delete().eq('post_id',pid).eq('user_id',user.id);
-    btn.className='act act-like';path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');
-    el.textContent=fmt(Math.max(0,n-1));btn.setAttribute('onclick','doLike(false)');
-  }else{
-    await sb.from('likes').insert({post_id:parseInt(pid),user_id:user.id});
-    btn.className='act act-like on';path.setAttribute('fill','var(--red)');path.setAttribute('stroke','var(--red)');
-    el.textContent=fmt(n+1);btn.setAttribute('onclick','doLike(true)');
+  const input = document.getElementById('comment-input');
+  const content = input.value.trim();
+  if (!content) return;
+
+  await sb.from('comments').insert({ post_id: postId, user_id: user.id, content });
+
+  input.value = '';
+  await loadComments();
+
+  // Update comment count in post
+  const countSpan = document.querySelector('.comment span');
+  if (countSpan) {
+    countSpan.textContent = fmtCount((parseInt(countSpan.textContent) || 0) + 1);
+  }
+
+  // Notification
+  const { data: post } = await sb.from('posts').select('author_id').eq('id', postId).single();
+  if (post && post.author_id !== user.id) {
+    await sb.from('notifications').insert({ user_id: post.author_id, from_user_id: user.id, type: 'comment', post_id: postId });
   }
 }
-async function doDelete(){
-  if(!confirm('Delete this post?'))return;
-  await sb.from('posts').delete().eq('id',pid);
-  history.back();
-}
-async function doShare(){
-  const url=location.href;
-  if(navigator.share){try{await navigator.share({title:'Truely',url});}catch(_){}}
-  else{await navigator.clipboard.writeText(url);toast('Link copied!');}
-}
-async function delCmt(cId){
-  await sb.from('comments').delete().eq('id',cId);
-  document.getElementById(`c-${cId}`)?.remove();
+
+async function deleteComment(commentId) {
+  if (!confirm('Delete this comment?')) return;
+  await sb.from('comments').delete().eq('id', commentId);
+  document.getElementById(`comment-${commentId}`)?.remove();
+  // Update comment count
+  const countSpan = document.querySelector('.comment span');
+  if (countSpan) {
+    countSpan.textContent = fmtCount(Math.max(0, (parseInt(countSpan.textContent) || 0) - 1));
+  }
 }
 
-Auth.init(()=>{
-  const p=T.state.profile;
-  const av=p?.avatar_url,name=p?.full_name||'U';
-  const el=document.getElementById('cmt-av-post');
-  if(el){el.innerHTML=av?`<img src="${av}"/>`:name.charAt(0);el.className=`av av-sm${Prof.ring(p)}`;}
-  loadPost();
+async function deletePost() {
+  if (!confirm('Delete this post?')) return;
+  await sb.from('posts').delete().eq('id', postId);
+  toast('Post deleted');
+  setTimeout(() => window.location.href = '/', 1000);
+}
+
+async function sharePost() {
+  const url = window.location.href;
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Truely', url }); } catch (e) {}
+  } else {
+    await navigator.clipboard.writeText(url);
+    toast('Link copied');
+  }
+}
+
+// Increment view count
+async function incrementView() {
+  const { data: post } = await sb.from('posts').select('view_count').eq('id', postId).single();
+  await sb.from('posts').update({ view_count: (post?.view_count || 0) + 1 }).eq('id', postId);
+}
+
+// Initialize
+initSharedAuth(async () => {
+  await loadPost();
+  await incrementView();
 });
-setTimeout(()=>{if(!T.state.user)loadPost();},400);
+setTimeout(() => {
+  if (!window.TruelyState.currentUser) loadPost();
+}, 400);
 </script>
 </body>
 </html>
