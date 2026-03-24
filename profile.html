@@ -1,30 +1,161 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Truely - User Profile">
-  <title>Truely — Profile</title>
-  <link rel="stylesheet" href="/css/style.css">
-</head>
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Profile</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
 <body>
-  <div id="nav-placeholder"></div>
-  
-  <main class="page-wrap">
-    <div class="container">
-      <div id="profile-header"></div>
-      <div id="profile-posts"></div>
-    </div>
-  </main>
-  
-  <div id="toast-container" class="toast-container"></div>
+<div id="_nav" data-page="home"></div>
+<div class="page-root"><div class="center-wrap" style="border-left:1px solid var(--border);border-right:1px solid var(--border)">
+<div style="display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="history.back()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="19"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  <span style="font-weight:700;font-family:'Syne',sans-serif;font-size:16px" id="prof-name-title">Profile</span>
+</div>
+<div id="prof-header"><div style="padding:32px;text-align:center"><div class="spinner"></div></div></div>
+<div class="tabs">
+  <div class="tab on" id="tab-posts" onclick="switchProfTab('posts')">Posts</div>
+  <div class="tab" id="tab-likes" onclick="switchProfTab('likes')">Likes</div>
+</div>
+<div id="prof-posts"></div>
+</div></div>
+<input type="file" id="cover-file" accept="image/*" style="display:none" onchange="updateCover(event)"/>
+<div class="toast" id="_toast"></div>
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent=CSS;
+const uid=new URLSearchParams(location.search).get('id');
+let profData=null,isOwn=false,following=false,profTab='posts';
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/config.js"></script>
-  <script src="/js/utils.js"></script>
-  <script src="/js/state.js"></script>
-  <script src="/js/auth.js"></script>
-  <script src="/js/components.js"></script>
-  <script src="/js/profile.js"></script>
+async function loadProf(){
+  if(!uid){location.href='/';return;}
+  const{data:p}=await sb.from('profiles').select('*').eq('id',uid).single();
+  if(!p){document.getElementById('prof-header').innerHTML='<div class="empty">User not found</div>';return;}
+  profData=p;
+  const user=T.state.user;
+  isOwn=user?.id===uid;
+  if(user&&!isOwn){
+    const{data:f}=await sb.from('follows').select('id').eq('follower_id',user.id).eq('following_id',uid).single();
+    following=!!f;
+  }
+  document.getElementById('prof-name-title').textContent=p.full_name||'Profile';
+  document.title=`${p.full_name||'Profile'} — Truely`;
+  const isAdmin=Prof.isAdmin(p),isVer=p.is_verified;
+  const ring=Prof.ring(p),badge=Prof.badge(p);
+  const av=p.avatar_url,cover=p.cover_url;
+  document.getElementById('prof-header').innerHTML=`
+    <div class="prof-cover" ${cover?`style="background:none"`:''}>${cover?`<img src="${cover}"/>`:''}
+      ${isOwn?`<button style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.6);border:none;color:#fff;padding:6px 12px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif" onclick="document.getElementById('cover-file').click()">Edit cover</button>`:''}
+    </div>
+    <div class="prof-head">
+      <div class="prof-top-row">
+        ${isOwn?`<button class="btn-ghost btn-sm" onclick="location.href='/settings.html'">Edit profile</button>`
+          :user?`<button class="btn-ghost btn-sm" onclick="location.href='/messages.html?to=${uid}'">Message</button>
+                 <button class="follow-btn ${following?'following':'follow'}" id="follow-btn" onclick="doFollow()">${following?'Following':'Follow'}</button>`:''}
+      </div>
+      <div class="prof-av-wrap">
+        <div class="av av-xl${ring}" style="border:4px solid var(--bg)">${av?`<img src="${av}"/>`:( (p.full_name||'U').charAt(0).toUpperCase())}</div>
+      </div>
+      <div class="prof-name">${esc(p.full_name||'User')}${badge}</div>
+      <div class="prof-handle">${p.email||''}</div>
+      ${p.bio?`<div class="prof-bio">${esc(p.bio)}</div>`:''}
+      ${p.website?`<div style="margin-top:6px;font-size:14px"><a href="${esc(p.website)}" target="_blank" style="color:var(--ind)">${esc(p.website)}</a></div>`:''}
+      <div class="prof-stats">
+        <div class="stat"><div class="stat-n">${fmt(p.post_count||0)}</div><div class="stat-l">Posts</div></div>
+        <div class="stat"><div class="stat-n">${fmt(p.follower_count||0)}</div><div class="stat-l">Followers</div></div>
+        <div class="stat"><div class="stat-n">${fmt(p.following_count||0)}</div><div class="stat-l">Following</div></div>
+      </div>
+    </div>`;
+  loadProfPosts();
+}
+
+function switchProfTab(tab){
+  profTab=tab;
+  document.getElementById('tab-posts').className='tab'+(tab==='posts'?' on':'');
+  document.getElementById('tab-likes').className='tab'+(tab==='likes'?' on':'');
+  loadProfPosts();
+}
+
+async function loadProfPosts(){
+  const wrap=document.getElementById('prof-posts');
+  wrap.innerHTML=`<div style="padding:32px;text-align:center"><div class="spinner"></div></div>`;
+  let posts;
+  if(profTab==='posts'){
+    const{data}=await sb.from('posts').select('*').eq('author_id',uid).order('created_at',{ascending:false});
+    posts=data;
+  } else {
+    const{data:lk}=await sb.from('likes').select('post_id').eq('user_id',uid);
+    const ids=(lk||[]).map(l=>l.post_id);
+    if(!ids.length){wrap.innerHTML='<div class="empty">No liked posts</div>';return;}
+    const{data}=await sb.from('posts').select('*').in('id',ids).order('created_at',{ascending:false});
+    posts=data;
+  }
+  if(!posts||!posts.length){wrap.innerHTML=`<div class="empty">${profTab==='posts'?'No posts yet':'No liked posts'}</div>`;return;}
+  const user=T.state.user;
+  let liked=new Set();
+  if(user){const{data:ml}=await sb.from('likes').select('post_id').eq('user_id',user.id);(ml||[]).forEach(l=>liked.add(l.post_id));}
+  wrap.innerHTML=posts.map((p,i)=>{
+    const name=profData?.full_name||'User',av=profData?.avatar_url;
+    const ring=Prof.ring(profData),badge=Prof.badge(profData);
+    const canDel=user?.email===T.ADMIN||user?.id===p.author_id;
+    const isLiked=liked.has(p.id),hf=isLiked?'var(--red)':'none',hs=isLiked?'var(--red)':'currentColor';
+    return `<div class="post" id="p-${p.id}" onclick="location.href='/post.html?id=${p.id}'" style="animation-delay:${i*30}ms">
+      <div class="post-row">
+        <div class="av av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
+        <div class="post-body">
+          <div class="post-meta"><span class="post-name">${esc(name)}</span>${badge}<span class="post-dot">·</span><span class="post-time">${ago(p.created_at)}</span></div>
+          ${p.content?`<div class="post-text">${linkHashtags(p.content)}</div>`:''}
+          ${p.image_url?`<img class="post-img" src="${p.image_url}" loading="lazy"/>`:''}
+          <div class="post-acts">
+            <button class="act act-like${isLiked?' on':''}" id="lb-${p.id}" onclick="tgLike(event,${p.id},${isLiked})">
+              <svg viewBox="0 0 24 24" fill="${hf}" stroke="${hs}" stroke-width="2" width="17" height="17"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              <span id="lc-${p.id}">${fmt(p.like_count||0)}</span>
+            </button>
+            ${canDel?`<button class="act act-del" onclick="delP(event,${p.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`:''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function doFollow(){
+  const user=T.state.user;if(!user){location.href='/landing.html';return;}
+  const btn=document.getElementById('follow-btn');
+  if(following){
+    await sb.from('follows').delete().eq('follower_id',user.id).eq('following_id',uid);
+    following=false;btn.textContent='Follow';btn.className='follow-btn follow';
+    toast('Unfollowed');
+  }else{
+    await sb.from('follows').insert({follower_id:user.id,following_id:uid});
+    following=true;btn.textContent='Following';btn.className='follow-btn following';
+    await sb.from('notifications').insert({user_id:uid,from_user_id:user.id,type:'follow'});
+    toast('Following!');
+  }
+}
+
+async function updateCover(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    await sb.from('profiles').update({cover_url:ev.target.result}).eq('id',uid);
+    toast('Cover updated!');loadProf();
+  };
+  r.readAsDataURL(file);
+}
+
+async function tgLike(e,postId,liked){
+  e.stopPropagation();const user=T.state.user;if(!user){location.href='/landing.html';return;}
+  const btn=document.getElementById(`lb-${postId}`),el=document.getElementById(`lc-${postId}`);
+  const n=parseInt(el.textContent)||0,path=btn.querySelector('path');
+  if(liked){await sb.from('likes').delete().eq('post_id',postId).eq('user_id',user.id);btn.className='act act-like';path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');el.textContent=fmt(Math.max(0,n-1));btn.setAttribute('onclick',`tgLike(event,${postId},false)`);}
+  else{await sb.from('likes').insert({post_id:postId,user_id:user.id});btn.className='act act-like on';path.setAttribute('fill','var(--red)');path.setAttribute('stroke','var(--red)');el.textContent=fmt(n+1);btn.setAttribute('onclick',`tgLike(event,${postId},true)`);}
+}
+async function delP(e,postId){
+  e.stopPropagation();if(!confirm('Delete?'))return;
+  await sb.from('posts').delete().eq('id',postId);
+  document.getElementById(`p-${postId}`)?.remove();toast('Deleted');
+}
+
+Auth.init(()=>loadProf());
+setTimeout(()=>{if(!T.state.user)loadProf();},400);
+</script>
 </body>
 </html>
