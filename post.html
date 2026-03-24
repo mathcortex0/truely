@@ -1,0 +1,139 @@
+<!-- POST.HTML -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Post</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
+<body>
+<div id="_nav" data-page="home"></div>
+<div class="page-root"><div class="center-wrap">
+<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="history.back()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  <span style="font-weight:600;font-size:15px">Back</span>
+</div>
+<div id="post-wrap" style="border-bottom:1px solid var(--border)"></div>
+<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+  <div style="display:flex;gap:10px;align-items:center">
+    <div class="av av-sm" id="cmt-av-post">T</div>
+    <input style="flex:1;padding:10px 14px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;" id="cmt-in" placeholder="Post your reply..." onkeydown="if(event.key==='Enter')submitCmt()"/>
+    <button class="btn-pri btn-sm" onclick="submitCmt()">Reply</button>
+  </div>
+</div>
+<div id="cmts-wrap"></div>
+</div></div>
+<div class="toast" id="_toast"></div>
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent=CSS;
+const pid=new URLSearchParams(location.search).get('id');
+
+async function loadPost(){
+  const{data:p}=await sb.from('posts').select('*').eq('id',pid).single();
+  if(!p){document.getElementById('post-wrap').innerHTML='<div class="empty">Post not found</div>';return;}
+  const{data:prof}=await sb.from('profiles').select('*').eq('id',p.author_id).single();
+  const user=T.state.user;
+  let liked=false;
+  if(user){const{data:l}=await sb.from('likes').select('id').eq('post_id',pid).eq('user_id',user.id).single();liked=!!l;}
+  const name=prof?.full_name||'User',av=prof?.avatar_url;
+  const ring=Prof.ring(prof),badge=Prof.badge(prof);
+  const canDel=user?.email===T.ADMIN||user?.id===p.author_id;
+  const hf=liked?'var(--red)':'none',hs=liked?'var(--red)':'currentColor';
+  document.getElementById('post-wrap').innerHTML=`
+    <div style="padding:16px">
+      <div style="display:flex;gap:12px;margin-bottom:12px">
+        <div class="av av-md${ring}" onclick="location.href='/profile.html?id=${p.author_id}'" style="cursor:pointer">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;display:flex;align-items:center;gap:4px;cursor:pointer" onclick="location.href='/profile.html?id=${p.author_id}'">${esc(name)}${badge}</div>
+          <div style="font-size:13px;color:var(--sub)">${new Date(p.created_at).toLocaleString()}</div>
+        </div>
+      </div>
+      ${p.content?`<div style="font-size:18px;line-height:1.7;margin-bottom:12px;white-space:pre-wrap;word-break:break-word">${linkHashtags(p.content)}</div>`:''}
+      ${p.image_url?`<img src="${p.image_url}" style="border-radius:12px;width:100%;max-height:500px;object-fit:cover;margin-bottom:12px;border:1px solid var(--border)"/>`:''}
+      <div style="display:flex;gap:16px;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:13px;color:var(--sub)">
+        <span><b style="color:var(--text)">${fmt(p.like_count||0)}</b> likes</span>
+        <span><b style="color:var(--text)">${fmt(p.comment_count||0)}</b> replies</span>
+        <span><b style="color:var(--text)">${fmt(p.repost_count||0)}</b> reposts</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;padding-top:4px">
+        <button class="act act-like${liked?' on':''}" id="lb" onclick="doLike(${liked})">
+          <svg viewBox="0 0 24 24" fill="${hf}" stroke="${hs}" stroke-width="2" width="20" height="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <span id="lc-post">${fmt(p.like_count||0)}</span>
+        </button>
+        <button class="act act-share" onclick="doShare()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </button>
+        ${canDel?`<button class="act act-del" onclick="doDelete()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`:''}
+      </div>
+    </div>`;
+  loadCmts();
+}
+
+async function loadCmts(){
+  const{data:cmts}=await sb.from('comments').select('*').eq('post_id',pid).order('created_at',{ascending:true});
+  if(!cmts||!cmts.length){document.getElementById('cmts-wrap').innerHTML='<div class="empty" style="padding:32px">No replies yet</div>';return;}
+  const ids=[...new Set(cmts.map(c=>c.user_id))];
+  const{data:profs}=await sb.from('profiles').select('*').in('id',ids);
+  const pm={};(profs||[]).forEach(p=>pm[p.id]=p);
+  const user=T.state.user;
+  document.getElementById('cmts-wrap').innerHTML=cmts.map(c=>{
+    const pr=pm[c.user_id],name=pr?.full_name||'User',av=pr?.avatar_url;
+    const ring=Prof.ring(pr),badge=Prof.badge(pr);
+    const canDel=user?.email===T.ADMIN||user?.id===c.user_id;
+    return `<div class="cmt-item" id="c-${c.id}">
+      <div class="av av-sm${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
+      <div class="cmt-bubble">
+        <div class="cmt-meta"><span class="cmt-name">${esc(name)}${badge}</span><span class="cmt-time">· ${ago(c.created_at)}</span>${canDel?`<button class="cmt-del" onclick="delCmt(${c.id})">✕</button>`:''}</div>
+        <div class="cmt-text">${esc(c.content)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function submitCmt(){
+  const user=T.state.user;if(!user){location.href='/landing.html';return;}
+  const input=document.getElementById('cmt-in'),text=input.value.trim();
+  if(!text)return;
+  await sb.from('comments').insert({post_id:parseInt(pid),user_id:user.id,content:text});
+  input.value='';
+  loadCmts();
+}
+
+async function doLike(liked){
+  const user=T.state.user;if(!user){location.href='/landing.html';return;}
+  const btn=document.getElementById('lb'),el=document.getElementById('lc-post');
+  const n=parseInt(el.textContent)||0,path=btn.querySelector('path');
+  if(liked){
+    await sb.from('likes').delete().eq('post_id',pid).eq('user_id',user.id);
+    btn.className='act act-like';path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');
+    el.textContent=fmt(Math.max(0,n-1));btn.setAttribute('onclick','doLike(false)');
+  }else{
+    await sb.from('likes').insert({post_id:parseInt(pid),user_id:user.id});
+    btn.className='act act-like on';path.setAttribute('fill','var(--red)');path.setAttribute('stroke','var(--red)');
+    el.textContent=fmt(n+1);btn.setAttribute('onclick','doLike(true)');
+  }
+}
+async function doDelete(){
+  if(!confirm('Delete this post?'))return;
+  await sb.from('posts').delete().eq('id',pid);
+  history.back();
+}
+async function doShare(){
+  const url=location.href;
+  if(navigator.share){try{await navigator.share({title:'Truely',url});}catch(_){}}
+  else{await navigator.clipboard.writeText(url);toast('Link copied!');}
+}
+async function delCmt(cId){
+  await sb.from('comments').delete().eq('id',cId);
+  document.getElementById(`c-${cId}`)?.remove();
+}
+
+Auth.init(()=>{
+  const p=T.state.profile;
+  const av=p?.avatar_url,name=p?.full_name||'U';
+  const el=document.getElementById('cmt-av-post');
+  if(el){el.innerHTML=av?`<img src="${av}"/>`:name.charAt(0);el.className=`av av-sm${Prof.ring(p)}`;}
+  loadPost();
+});
+setTimeout(()=>{if(!T.state.user)loadPost();},400);
+</script>
+</body>
+</html>
