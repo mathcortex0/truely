@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Checkout</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/db.js"></script>
+</head>
+<body>
+    <div class="container" style="max-width: 600px; display: flex; align-items: center; justify-content: center; height: 80vh;">
+        <div class="card" style="width: 100%; text-align: center;">
+            <h2>Secure Payment</h2>
+            <p id="exam-details" style="margin: 1rem 0; color: var(--text-muted);">Loading...</p>
+            <div style="margin: 2rem 0; font-size: 2rem; font-weight: bold;">$ <span id="price-display">0</span></div>
+            <button onclick="processPayment()" id="pay-btn" class="btn btn-primary" style="width: 100%;">Pay Now</button>
+        </div>
+    </div>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const examId = params.get('id');
+
+        async function processPayment() {
+            const user = await getCurrentUser();
+            const btn = document.getElementById('pay-btn');
+            
+            btn.innerText = "Processing...";
+            btn.disabled = true;
+
+            // Mock processing delay
+            setTimeout(async () => {
+                const { error } = await sb.from('purchases').insert({
+                    user_id: user.id,
+                    exam_id: examId
+                });
+                
+                if(error) {
+                    alert("Error: " + error.message);
+                    btn.disabled = false;
+                    btn.innerText = "Pay Now";
+                } else {
+                    window.location.href = `exam.html?id=${examId}`;
+                }
+            }, 1500);
+        }
+
+        // Load Exam Info
+        (async () => {
+            const { data } = await sb.from('exams').select('title, price').eq('id', examId).single();
+            if(data) {
+                document.getElementById('exam-details').innerText = `Purchasing: ${data.title}`;
+                document.getElementById('price-display').innerText = data.price;
+            }
+        })();
+    </script>
+</body>
+</html>
