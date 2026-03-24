@@ -1,69 +1,541 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Truely - Say What's Real. Connect with friends and share your thoughts.">
-  <title>Truely — Feed</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/%3E%3C/svg%3E">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Truely</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="_css"></style>
 </head>
 <body>
-  <div id="nav-placeholder"></div>
-  
-  <main class="page-wrap">
-    <div class="container">
-      <div id="compose-box" class="compose-box" style="display: none;">
-        <div class="compose-inner">
-          <div class="avatar avatar-md" id="compose-avatar"></div>
-          <div class="compose-right">
-            <textarea id="post-content" class="compose-textarea" placeholder="What's happening?" maxlength="600" rows="3"></textarea>
-            <div class="compose-footer">
-              <span class="char-count" id="char-count">0 / 280</span>
-              <button class="btn btn-primary btn-sm" id="post-submit">Post</button>
+<div id="_nav" data-page="home"></div>
+
+<div class="page-root">
+<div class="wide-wrap">
+<div class="feed-col" id="feed-col">
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab on" id="tab-fy" onclick="switchTab('fy')">For You</div>
+    <div class="tab" id="tab-fl" onclick="switchTab('fl')">Following</div>
+  </div>
+
+  <!-- NEW POSTS PILL -->
+  <div class="new-pill" id="new-pill">
+    <div class="new-pill-inner" onclick="refreshFeed()" id="pill-inner">New posts</div>
+  </div>
+
+  <!-- COMPOSE (desktop) -->
+  <div class="compose" id="compose-desk" style="display:none">
+    <div class="compose-row">
+      <div class="av av-md" id="compose-av">T</div>
+      <div class="compose-right">
+        <textarea class="compose-ta" id="compose-ta" placeholder="What's happening?" oninput="Compose.update()" rows="3"></textarea>
+        <div id="img-preview-desk"></div>
+        <div class="compose-foot">
+          <div class="compose-tools">
+            <button class="icon-btn" id="img-btn-desk" style="display:none" onclick="document.getElementById('img-file-desk').click()" title="Add image">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+            <input type="file" id="img-file-desk" accept="image/*" style="display:none" onchange="Compose.setImage(event)"/>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="ring-wrap">
+              <svg class="ring-svg" width="28" height="28"><circle cx="14" cy="14" r="11" fill="none" stroke="var(--border)" stroke-width="2.5"/><circle id="ring-circle" cx="14" cy="14" r="11" fill="none" stroke="var(--ind)" stroke-width="2.5" stroke-dasharray="69" stroke-dashoffset="69" stroke-linecap="round"/></svg>
+              <div class="ring-count" id="ring-count"></div>
             </div>
+            <button class="btn-pri btn-sm" onclick="Compose.submit()">Post</button>
           </div>
         </div>
-      </div>
-      
-      <div id="posts-container"></div>
-    </div>
-  </main>
-  
-  <div id="toast-container" class="toast-container"></div>
-  
-  <div id="verify-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">Get Verified</div>
-      <div class="modal-body">
-        <p style="margin-bottom: var(--spacing-md);">Upgrade to verified account:</p>
-        <div style="background: var(--bg-secondary); padding: var(--spacing-md); border-radius: var(--radius-lg); margin-bottom: var(--spacing-md);">
-          <p style="font-weight: 600; margin-bottom: var(--spacing-xs);">Benefits:</p>
-          <ul style="margin-left: var(--spacing-lg); color: var(--text-secondary);">
-            <li>✓ Blue verification badge</li>
-            <li>✓ 600 character posts (instead of 280)</li>
-            <li>✓ 400 character messages</li>
-            <li>✓ Priority support</li>
-          </ul>
-        </div>
-        <div style="background: rgba(79, 70, 229, 0.1); padding: var(--spacing-md); border-radius: var(--radius-lg); text-align: center;">
-          <p style="font-weight: 600; color: var(--accent-indigo);">Contact Admin</p>
-          <p class="text-muted" style="font-size: 0.875rem;">Email: alamin05052008@gmail.com</p>
-          <p class="text-muted" style="font-size: 0.75rem;">Payment: 99 BDT/month</p>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeVerifyModal()">Close</button>
       </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/config.js"></script>
-  <script src="/js/utils.js"></script>
-  <script src="/js/state.js"></script>
-  <script src="/js/auth.js"></script>
-  <script src="/js/components.js"></script>
-  <script src="/js/feed.js"></script>
+  <div id="posts-list"></div>
+  <div id="load-more-wrap" style="padding:16px;text-align:center;display:none">
+    <button class="btn-ghost btn-sm" onclick="Feed.loadMore()">Load more</button>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div class="side-col">
+  <div class="side-card" id="trending-card">
+    <div class="side-title">Trending</div>
+    <div id="trending-list"><div class="spinner"></div></div>
+  </div>
+  <div class="side-card" id="who-card">
+    <div class="side-title">Who to follow</div>
+    <div id="who-list"><div class="spinner"></div></div>
+  </div>
+</div>
+</div>
+</div>
+
+<!-- MOBILE COMPOSE SHEET -->
+<div class="sheet-bg" id="mob-compose-bg" onclick="Compose.close()"></div>
+<div class="sheet" id="mob-compose-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">New post</div>
+  <div style="padding:14px 16px">
+    <div style="display:flex;gap:12px">
+      <div class="av av-md" id="compose-av-mob">T</div>
+      <div style="flex:1">
+        <textarea class="compose-ta" id="compose-ta-mob" placeholder="What's on your mind?" oninput="Compose.update()" rows="4" style="width:100%"></textarea>
+        <div id="img-preview-mob"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+      <div style="display:flex;gap:8px">
+        <button class="icon-btn" id="img-btn-mob" style="display:none" onclick="document.getElementById('img-file-mob').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </button>
+        <input type="file" id="img-file-mob" accept="image/*" style="display:none" onchange="Compose.setImage(event)"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="mob-count" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--sub)"></span>
+        <button class="btn-pri btn-sm" onclick="Compose.submit()">Post</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMENTS SHEET -->
+<div class="sheet-bg" id="cmt-bg" onclick="Comments.close()"></div>
+<div class="sheet" id="cmt-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head" id="cmt-title">Replies</div>
+  <div class="sheet-body" id="cmt-body"></div>
+  <div class="sheet-foot">
+    <div class="av av-xs" id="cmt-av">T</div>
+    <input class="cmt-input" id="cmt-input" placeholder="Post your reply..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Comments.submit();}"/>
+    <button class="cmt-send" onclick="Comments.submit()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="_toast"></div>
+<input type="file" id="_av-file" accept="image/*" style="display:none" onchange="updateAvatar(event)"/>
+
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent = CSS;
+
+// ── STATE ──────────────────────────────────────────────
+let feedTab    = 'fy';
+let feedOffset = 0;
+const PAGE     = 15;
+let pendingNew = 0;
+let imgDataUrl = null;
+let activeCmtPost = null;
+
+// ── COMPOSE ──────────────────────────────────────────
+window.Compose = {
+  open() {
+    if(!T.state.user){window.location.href='/landing.html';return;}
+    const bg=document.getElementById('mob-compose-bg'),sh=document.getElementById('mob-compose-sheet');
+    bg.classList.add('open');sh.classList.add('open');
+    setTimeout(()=>document.getElementById('compose-ta-mob')?.focus(),300);
+  },
+  close() {
+    document.getElementById('mob-compose-bg').classList.remove('open');
+    document.getElementById('mob-compose-sheet').classList.remove('open');
+  },
+  update() {
+    const p = T.state.profile;
+    const limit = Prof.postLimit(p);
+    const taD = document.getElementById('compose-ta');
+    const taM = document.getElementById('compose-ta-mob');
+    const text = (taD?.value||'')+(taM?.value||'');
+    // ring
+    const rc = document.getElementById('ring-circle');
+    const rn = document.getElementById('ring-count');
+    const mc = document.getElementById('mob-count');
+    if(rc){
+      const pct = limit===Infinity?0:Math.min(text.length/limit,1);
+      const dash = 69;
+      rc.style.strokeDashoffset = dash-(dash*pct);
+      rc.style.stroke = pct>=1?'var(--red)':pct>=0.85?'var(--gold)':'var(--ind)';
+      if(rn) rn.textContent = pct>=0.85?(limit-text.length):'';
+    }
+    if(mc) mc.textContent = limit===Infinity?`${text.length}`:text.length>limit*0.7?`${text.length}/${limit}`:'';
+  },
+  setImage(e) {
+    const file=e.target.files[0];
+    if(!file)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      imgDataUrl=ev.target.result;
+      ['desk','mob'].forEach(s=>{
+        const el=document.getElementById(`img-preview-${s}`);
+        if(el)el.innerHTML=`<div class="img-preview"><img src="${imgDataUrl}"/><button class="img-preview-del" onclick="Compose.removeImg()">✕</button></div>`;
+      });
+    };
+    r.readAsDataURL(file);
+  },
+  removeImg() {
+    imgDataUrl=null;
+    ['desk','mob'].forEach(s=>{
+      const el=document.getElementById(`img-preview-${s}`);
+      if(el)el.innerHTML='';
+    });
+  },
+  async submit() {
+    const user=T.state.user;
+    if(!user){window.location.href='/landing.html';return;}
+    const taD=document.getElementById('compose-ta'),taM=document.getElementById('compose-ta-mob');
+    const text=(taD?.value||taM?.value||'').trim();
+    const limit=Prof.postLimit(T.state.profile);
+    if(!text&&!imgDataUrl){toast('Write something first!','err');return;}
+    if(limit!==Infinity&&text.length>limit){toast(`Too long — max ${limit} chars`,'err');return;}
+    const {error}=await sb.from('posts').insert({author_id:user.id,content:text||null,image_url:imgDataUrl||null});
+    if(error){toast('Failed to post','err');return;}
+    if(taD)taD.value='';if(taM)taM.value='';
+    imgDataUrl=null;
+    ['desk','mob'].forEach(s=>{const el=document.getElementById(`img-preview-${s}`);if(el)el.innerHTML='';});
+    Compose.close();Compose.update();
+    toast('Posted!');
+    refreshFeed();
+  }
+};
+
+// ── FEED ────────────────────────────────────────────
+window.Feed = {
+  async load(reset=true) {
+    if(reset){feedOffset=0;document.getElementById('posts-list').innerHTML=skelPosts(3);}
+    let q = sb.from('posts').select('*').order('created_at',{ascending:false}).range(feedOffset,feedOffset+PAGE-1);
+    if(feedTab==='fl'&&T.state.user){
+      const {data:fl}=await sb.from('follows').select('following_id').eq('follower_id',T.state.user.id);
+      const ids=(fl||[]).map(f=>f.following_id);
+      if(!ids.length){
+        document.getElementById('posts-list').innerHTML='<div class="empty"><div class="empty-icon">👥</div><p>Follow people to see their posts here</p></div>';
+        document.getElementById('load-more-wrap').style.display='none';
+        return;
+      }
+      q=q.in('author_id',ids);
+    }
+    const {data:posts}=await q;
+    if(!posts||posts.length===0){
+      if(reset)document.getElementById('posts-list').innerHTML='<div class="empty"><div class="empty-icon">✨</div><p>No posts yet — be the first!</p></div>';
+      document.getElementById('load-more-wrap').style.display='none';
+      return;
+    }
+    const rendered = await renderPosts(posts);
+    if(reset)document.getElementById('posts-list').innerHTML=rendered;
+    else document.getElementById('posts-list').insertAdjacentHTML('beforeend',rendered);
+    feedOffset+=posts.length;
+    document.getElementById('load-more-wrap').style.display=posts.length<PAGE?'none':'block';
+  },
+  loadMore(){Feed.load(false);}
+};
+
+async function renderPosts(posts) {
+  const ids=[...new Set(posts.map(p=>p.author_id))];
+  const {data:profs}=await sb.from('profiles').select('*').in('id',ids);
+  const pm={};(profs||[]).forEach(p=>pm[p.id]=p);
+  const user=T.state.user;
+  let liked=new Set(),reposted=new Set();
+  if(user){
+    const {data:ml}=await sb.from('likes').select('post_id').eq('user_id',user.id);
+    (ml||[]).forEach(l=>liked.add(l.post_id));
+    const {data:mr}=await sb.from('reposts').select('post_id').eq('user_id',user.id);
+    (mr||[]).forEach(r=>reposted.add(r.post_id));
+  }
+  return posts.map((p,i)=>postCard(p,pm[p.author_id],liked.has(p.id),reposted.has(p.id),i)).join('');
+}
+
+function postCard(p,prof,liked,reposted,idx=0) {
+  const name=prof?.full_name||'User',av=prof?.avatar_url;
+  const isAdmin=Prof.isAdmin(prof),isVer=Prof.isVerified(prof);
+  const ring=Prof.ring(prof),badge=Prof.badge(prof);
+  const user=T.state.user;
+  const canDel=user?.email===T.ADMIN||user?.id===p.author_id;
+  const hf=liked?'var(--red)':'none',hs=liked?'var(--red)':'currentColor';
+  const repCol=reposted?'var(--green)':'currentColor';
+  return `<div class="post" id="p-${p.id}" style="animation-delay:${idx*40}ms" onclick="openPost(${p.id})">
+    <div class="post-row">
+      <div class="av av-md${ring}" onclick="goProf('${p.author_id}',event)" style="cursor:pointer">${av?`<img src="${av}"/>`:name.charAt(0).toUpperCase()}</div>
+      <div class="post-body">
+        <div class="post-meta">
+          <span class="post-name" onclick="goProf('${p.author_id}',event)">${esc(name)}</span>${badge}
+          <span class="post-dot">·</span><span class="post-time">${ago(p.created_at)}</span>
+        </div>
+        ${p.content?`<div class="post-text">${linkHashtags(p.content)}</div>`:''}
+        ${p.image_url?`<img class="post-img" src="${p.image_url}" alt="" onclick="event.stopPropagation()" loading="lazy"/>`:''}
+        <div class="post-acts">
+          <button class="act act-like${liked?' on':''}" id="lb-${p.id}" onclick="toggleLike(event,${p.id},${liked})">
+            <svg viewBox="0 0 24 24" fill="${hf}" stroke="${hs}" stroke-width="2" width="17" height="17"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            <span id="lc-${p.id}">${fmt(p.like_count||0)}</span>
+          </button>
+          <button class="act act-cmt" onclick="Comments.open(${p.id},event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span id="cc-${p.id}">${fmt(p.comment_count||0)}</span>
+          </button>
+          <button class="act act-rep${reposted?' on':''}" id="rb-${p.id}" onclick="toggleRepost(event,${p.id},${reposted})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="${repCol}" stroke-width="2" width="17" height="17"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            <span id="rc-${p.id}">${fmt(p.repost_count||0)}</span>
+          </button>
+          <button class="act act-share" onclick="sharePost(event,${p.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          </button>
+          ${canDel?`<button class="act act-del" onclick="delPost(event,${p.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>`:''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── INTERACTIONS ─────────────────────────────────────
+function goProf(id,e){e?.stopPropagation();window.location.href=`/profile.html?id=${id}`;}
+function openPost(id){window.location.href=`/post.html?id=${id}`;}
+
+async function toggleLike(e,postId,liked){
+  e.stopPropagation();
+  if(!T.state.user){window.location.href='/landing.html';return;}
+  const btn=document.getElementById(`lb-${postId}`),el=document.getElementById(`lc-${postId}`);
+  const n=parseInt(el.textContent)||0;
+  if(liked){
+    await sb.from('likes').delete().eq('post_id',postId).eq('user_id',T.state.user.id);
+    btn.className='act act-like';
+    const path=btn.querySelector('path');path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');
+    el.textContent=fmt(Math.max(0,n-1));
+    btn.setAttribute('onclick',`toggleLike(event,${postId},false)`);
+  }else{
+    await sb.from('likes').insert({post_id:postId,user_id:T.state.user.id});
+    btn.className='act act-like on';
+    const path=btn.querySelector('path');path.setAttribute('fill','var(--red)');path.setAttribute('stroke','var(--red)');
+    el.textContent=fmt(n+1);
+    btn.setAttribute('onclick',`toggleLike(event,${postId},true)`);
+    const {data:post}=await sb.from('posts').select('author_id').eq('id',postId).single();
+    if(post&&post.author_id!==T.state.user.id)
+      await sb.from('notifications').insert({user_id:post.author_id,from_user_id:T.state.user.id,type:'like',post_id:postId});
+  }
+}
+
+async function toggleRepost(e,postId,reposted){
+  e.stopPropagation();
+  if(!T.state.user){window.location.href='/landing.html';return;}
+  const btn=document.getElementById(`rb-${postId}`),el=document.getElementById(`rc-${postId}`);
+  const n=parseInt(el.textContent)||0;
+  if(reposted){
+    await sb.from('reposts').delete().eq('post_id',postId).eq('user_id',T.state.user.id);
+    btn.className='act act-rep';
+    btn.querySelector('svg').style.stroke='currentColor';
+    el.textContent=fmt(Math.max(0,n-1));
+    btn.setAttribute('onclick',`toggleRepost(event,${postId},false)`);
+    toast('Repost removed');
+  }else{
+    await sb.from('reposts').insert({post_id:postId,user_id:T.state.user.id});
+    btn.className='act act-rep on';
+    btn.querySelector('svg').style.stroke='var(--green)';
+    el.textContent=fmt(n+1);
+    btn.setAttribute('onclick',`toggleRepost(event,${postId},true)`);
+    toast('Reposted!');
+  }
+}
+
+async function delPost(e,postId){
+  e.stopPropagation();
+  if(!confirm('Delete this post?'))return;
+  await sb.from('posts').delete().eq('id',postId);
+  const el=document.getElementById(`p-${postId}`);
+  if(el){el.style.opacity='0';el.style.transform='scale(.98)';el.style.transition='all .2s';setTimeout(()=>el.remove(),200);}
+  toast('Deleted');
+}
+
+async function sharePost(e,postId){
+  e.stopPropagation();
+  const url=`${location.origin}/post.html?id=${postId}`;
+  if(navigator.share){try{await navigator.share({title:'Truely',url});}catch(_){}}
+  else{await navigator.clipboard.writeText(url);toast('Link copied!');}
+}
+
+// ── COMMENTS ─────────────────────────────────────────
+window.Comments = {
+  async open(postId,e){
+    e?.stopPropagation();
+    activeCmtPost=postId;
+    const bg=document.getElementById('cmt-bg'),sh=document.getElementById('cmt-sheet');
+    bg.classList.add('open');sh.classList.add('open');
+    document.getElementById('cmt-body').innerHTML=`<div style="padding:24px;text-align:center"><div class="spinner"></div></div>`;
+    await Comments.load(postId);
+    setTimeout(()=>document.getElementById('cmt-input')?.focus(),300);
+  },
+  close(){
+    document.getElementById('cmt-bg').classList.remove('open');
+    document.getElementById('cmt-sheet').classList.remove('open');
+    activeCmtPost=null;
+  },
+  async load(postId){
+    const {data:cmts}=await sb.from('comments').select('*').eq('post_id',postId).order('created_at',{ascending:true});
+    document.getElementById('cmt-title').textContent=`Replies (${cmts?.length||0})`;
+    if(!cmts||!cmts.length){document.getElementById('cmt-body').innerHTML='<div class="empty" style="padding:32px">No replies yet</div>';return;}
+    const ids=[...new Set(cmts.map(c=>c.user_id))];
+    const {data:profs}=await sb.from('profiles').select('*').in('id',ids);
+    const pm={};(profs||[]).forEach(p=>pm[p.id]=p);
+    const user=T.state.user;
+    document.getElementById('cmt-body').innerHTML=cmts.map(c=>{
+      const pr=pm[c.user_id],name=pr?.full_name||'User',av=pr?.avatar_url;
+      const isAdmin=Prof.isAdmin(pr),isVer=Prof.isVerified(pr);
+      const ring=Prof.ring(pr),badge=Prof.badge(pr);
+      const canDel=user?.email===T.ADMIN||user?.id===c.user_id;
+      return `<div class="cmt-item" id="c-${c.id}">
+        <div class="av av-sm${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
+        <div class="cmt-bubble">
+          <div class="cmt-meta"><span class="cmt-name">${esc(name)}${badge}</span><span class="cmt-time">· ${ago(c.created_at)}</span>${canDel?`<button class="cmt-del" onclick="Comments.del(${c.id},${postId})">✕</button>`:''}</div>
+          <div class="cmt-text">${esc(c.content)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  },
+  async submit(){
+    const user=T.state.user;
+    if(!user){window.location.href='/landing.html';return;}
+    const input=document.getElementById('cmt-input');
+    const text=input.value.trim();
+    if(!text||!activeCmtPost)return;
+    await sb.from('comments').insert({post_id:activeCmtPost,user_id:user.id,content:text});
+    input.value='';
+    await Comments.load(activeCmtPost);
+    const el=document.getElementById(`cc-${activeCmtPost}`);
+    if(el)el.textContent=fmt((parseInt(el.textContent)||0)+1);
+    const {data:post}=await sb.from('posts').select('author_id').eq('id',activeCmtPost).single();
+    if(post&&post.author_id!==user.id)
+      await sb.from('notifications').insert({user_id:post.author_id,from_user_id:user.id,type:'comment',post_id:activeCmtPost});
+  },
+  async del(cId,postId){
+    await sb.from('comments').delete().eq('id',cId);
+    document.getElementById(`c-${cId}`)?.remove();
+    const el=document.getElementById(`cc-${postId}`);
+    if(el)el.textContent=fmt(Math.max(0,(parseInt(el.textContent)||0)-1));
+    const title=document.getElementById('cmt-title');
+    if(title){const n=parseInt(title.textContent.match(/\d+/)?.[0]||0);title.textContent=`Replies (${Math.max(0,n-1)})`;}
+  }
+};
+
+// ── TABS ─────────────────────────────────────────────
+function switchTab(tab){
+  feedTab=tab;
+  document.getElementById('tab-fy').className='tab'+(tab==='fy'?' on':'');
+  document.getElementById('tab-fl').className='tab'+(tab==='fl'?' on':'');
+  Feed.load();
+}
+
+// ── REFRESH ──────────────────────────────────────────
+async function refreshFeed(){
+  document.getElementById('new-pill').style.display='none';
+  pendingNew=0;
+  Feed.load();
+}
+
+// ── SKELETON ─────────────────────────────────────────
+function skelPosts(n){
+  return Array(n).fill(0).map(()=>`<div class="skel-post"><div class="skel av-md skel-av"></div><div class="skel-lines"><div class="skel skel-line" style="width:38%"></div><div class="skel skel-line" style="width:82%"></div><div class="skel skel-line" style="width:60%"></div></div></div>`).join('');
+}
+
+// ── SIDEBAR ──────────────────────────────────────────
+async function loadSidebar(){
+  // Trending
+  const {data:tags}=await sb.from('hashtags').select('tag').order('created_at',{ascending:false}).limit(50);
+  const tc={};(tags||[]).forEach(t=>tc[t.tag]=(tc[t.tag]||0)+1);
+  const sorted=Object.entries(tc).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  document.getElementById('trending-list').innerHTML=sorted.length?sorted.map(([tag,count])=>`
+    <div class="trend-item" onclick="window.location.href='/search.html?q=%23${tag}'">
+      <div class="trend-tag">#${esc(tag)}</div>
+      <div class="trend-count">${count} post${count!==1?'s':''}</div>
+    </div>`).join(''):'<div style="color:var(--sub);font-size:13px">No trends yet</div>';
+
+  // Who to follow
+  const user=T.state.user;
+  if(!user){document.getElementById('who-list').innerHTML='<div style="color:var(--sub);font-size:13px">Sign in to see suggestions</div>';return;}
+  let followed=[];
+  const {data:fl}=await sb.from('follows').select('following_id').eq('follower_id',user.id);
+  followed=(fl||[]).map(f=>f.following_id);
+  followed.push(user.id);
+  const {data:suggest}=await sb.from('profiles').select('*').not('id','in',`(${followed.join(',')}`).order('follower_count',{ascending:false}).limit(4);
+  document.getElementById('who-list').innerHTML=(suggest||[]).length?(suggest||[]).map(p=>`
+    <div class="who-item">
+      <div class="av av-sm${Prof.ring(p)}" style="cursor:pointer" onclick="goProf('${p.id}')">${p.avatar_url?`<img src="${p.avatar_url}"/>`:p.full_name?.charAt(0)||'U'}</div>
+      <div style="flex:1;min-width:0">
+        <div class="who-name" onclick="goProf('${p.id}')">${esc(p.full_name||'User')}${Prof.badge(p)}</div>
+        <div class="who-sub">${fmt(p.follower_count||0)} followers</div>
+      </div>
+      <div class="who-right">
+        <button class="follow-pill" id="fp-${p.id}" onclick="sideFollow('${p.id}',false)">Follow</button>
+      </div>
+    </div>`).join(''):'<div style="color:var(--sub);font-size:13px">No suggestions</div>';
+}
+
+async function sideFollow(id,following){
+  const user=T.state.user;
+  if(!user){window.location.href='/landing.html';return;}
+  const btn=document.getElementById(`fp-${id}`);
+  if(following){
+    await sb.from('follows').delete().eq('follower_id',user.id).eq('following_id',id);
+    btn.textContent='Follow';btn.classList.remove('on');
+    btn.setAttribute('onclick',`sideFollow('${id}',false)`);
+  }else{
+    await sb.from('follows').insert({follower_id:user.id,following_id:id});
+    btn.textContent='Following';btn.classList.add('on');
+    btn.setAttribute('onclick',`sideFollow('${id}',true)`);
+    await sb.from('notifications').insert({user_id:id,from_user_id:user.id,type:'follow'});
+    toast('Following!');
+  }
+}
+
+// ── AVATAR UPDATE ─────────────────────────────────────
+async function updateAvatar(e){
+  const file=e.target.files[0];
+  if(!file||!T.state.user)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    await sb.from('profiles').update({avatar_url:ev.target.result}).eq('id',T.state.user.id);
+    T.state.profile.avatar_url=ev.target.result;
+    Nav.render();
+    updateComposeAv();
+    toast('Photo updated!');
+  };
+  r.readAsDataURL(file);
+}
+function updateComposeAv(){
+  const p=T.state.profile,av=p?.avatar_url,name=p?.full_name||'U';
+  ['compose-av','compose-av-mob','cmt-av'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.innerHTML=av?`<img src="${av}"/>`:name.charAt(0).toUpperCase();el.className=`av ${id.includes('mob')||id==='cmt-av'?'av-sm':'av-md'}${Prof.ring(p)}`;}
+  });
+}
+
+// ── REALTIME NEW POSTS ────────────────────────────────
+function setupRealtime(){
+  sb.channel('posts').on('postgres_changes',{event:'INSERT',schema:'public',table:'posts'},payload=>{
+    if(payload.new.author_id===T.state.user?.id)return;
+    pendingNew++;
+    const pill=document.getElementById('new-pill'),inner=document.getElementById('pill-inner');
+    pill.style.display='block';
+    inner.textContent=`${pendingNew} new post${pendingNew>1?'s':''}`;
+  }).subscribe();
+}
+
+// ── INIT ─────────────────────────────────────────────
+Auth.init((user,profile)=>{
+  if(!user){
+    // show public feed for logged out
+    document.getElementById('compose-desk').style.display='none';
+  } else {
+    document.getElementById('compose-desk').style.display='block';
+    updateComposeAv();
+    // show image btn for admin
+    if(Prof.isAdmin(profile)){
+      document.getElementById('img-btn-desk').style.display='flex';
+      document.getElementById('img-btn-mob').style.display='flex';
+    }
+    setupRealtime();
+  }
+  Feed.load();
+  loadSidebar();
+});
+</script>
 </body>
 </html>
