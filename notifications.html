@@ -1,99 +1,35 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Truely — Notifications</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style id="shared-css"></style>
-<style>
-.page-head{padding:16px;border-bottom:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:space-between;}
-.page-head h1{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;}
-.notif-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--card);transition:background 0.15s;animation:fadeIn 0.3s ease;cursor:pointer;}
-.notif-item:hover{background:var(--hover);}
-.notif-item.unread{background:rgba(79,70,229,0.04);border-left:3px solid var(--indigo);}
-.notif-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.notif-icon.like{background:rgba(239,68,68,0.1);}
-.notif-icon.comment{background:rgba(79,70,229,0.1);}
-.notif-icon.follow{background:rgba(6,182,212,0.1);}
-.notif-text{flex:1;}
-.notif-text b{font-weight:700;}
-.notif-time{font-size:12px;color:var(--muted);margin-top:2px;}
-.empty-state{text-align:center;padding:64px 20px;color:var(--muted);}
-.empty-icon{font-size:48px;margin-bottom:12px;}
-.skel-notif{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Truely - Notifications">
+  <title>Truely — Notifications</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<div id="nav-placeholder"></div>
-<div class="page-wrap">
-  <div class="wrap">
-    <div class="page-head">
-      <h1>Notifications</h1>
-      <button class="btn btn-ghost btn-sm" onclick="markAllRead()">Mark all read</button>
-    </div>
-    <div id="notif-list"></div>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
-<script src="/supabase.js"></script>
-<script>
-document.getElementById('shared-css').textContent = SHARED_CSS;
-document.getElementById('nav-placeholder').innerHTML = getNavHTML('notifications');
-
-async function loadNotifications() {
-  const user = window.TruelyState.currentUser;
-  const list = document.getElementById('notif-list');
-  if (!user) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔔</div><p>Sign in to see notifications</p></div>'; return; }
-  list.innerHTML = [1,2,3].map(()=>`<div class="skel-notif"><div class="skeleton" style="width:40px;height:40px;border-radius:50%;flex-shrink:0"></div><div style="flex:1"><div class="skeleton skel-line" style="width:70%;height:12px;border-radius:6px;margin-bottom:6px"></div><div class="skeleton skel-line" style="width:40%;height:10px;border-radius:6px"></div></div></div>`).join('');
-  const { data: notifs } = await sb.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
-  if (!notifs || notifs.length === 0) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔔</div><p>No notifications yet</p></div>'; return; }
-  const fromIds = [...new Set(notifs.map(n => n.from_user_id).filter(Boolean))];
-  const { data: profiles } = await sb.from('profiles').select('*').in('id', fromIds);
-  const pm = {}; (profiles||[]).forEach(p => pm[p.id] = p);
-  list.innerHTML = notifs.map(n => {
-    const from = pm[n.from_user_id];
-    const name = from?.full_name || 'Someone';
-    const isAdmin = from?.is_admin || from?.email === ADMIN_EMAIL;
-    const isVerified = from?.is_verified;
-    const badge = isAdmin ? adminBadge() : isVerified ? verifiedBadge(14) : '';
-    const av = from?.avatar_url;
-    let icon = '', text = '', iconClass = '';
-    if (n.type === 'like') { icon = '❤️'; iconClass = 'like'; text = `liked your post`; }
-    else if (n.type === 'comment') { icon = '💬'; iconClass = 'comment'; text = `replied to your post`; }
-    else if (n.type === 'follow') { icon = '👤'; iconClass = 'follow'; text = `started following you`; }
-    const onclick = n.post_id ? `window.location.href='/?post=${n.post_id}'` : `window.location.href='/profile.html?id=${n.from_user_id}'`;
-    return `<div class="notif-item${n.read?'':' unread'}" id="notif-${n.id}" onclick="${onclick};markRead(${n.id})">
-      <div class="notif-icon ${iconClass}">${icon}</div>
-      <div style="display:flex;align-items:center;gap:8px;flex:1">
-        <div class="avatar av-sm${isAdmin?' admin-ring':isVerified?' verified-ring':''}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
-        <div class="notif-text">
-          <div><b>${escHtml(name)}</b>${badge} ${text}</div>
-          <div class="notif-time">${timeAgo(n.created_at)}</div>
+  <div id="nav-placeholder"></div>
+  
+  <main class="page-wrap">
+    <div class="container">
+      <div class="profile-header" style="padding: var(--spacing-md);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h1 style="font-size: 1.5rem;">Notifications</h1>
+          <button id="mark-all-read" class="btn btn-sm btn-secondary">Mark all read</button>
         </div>
       </div>
-    </div>`;
-  }).join('');
-  // Mark all as read on open
-  await sb.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
-  document.getElementById('notif-dot')?.style && (document.getElementById('notif-dot').style.display = 'none');
-}
+      <div id="notifications-list"></div>
+    </div>
+  </main>
+  
+  <div id="toast-container" class="toast-container"></div>
 
-async function markRead(id) {
-  await sb.from('notifications').update({ read: true }).eq('id', id);
-  document.getElementById(`notif-${id}`)?.classList.remove('unread');
-}
-
-async function markAllRead() {
-  const user = window.TruelyState.currentUser;
-  if (!user) return;
-  await sb.from('notifications').update({ read: true }).eq('user_id', user.id);
-  document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
-  showToast('All marked as read ✓');
-}
-
-initSharedAuth(() => loadNotifications());
-setTimeout(() => { if (!window.TruelyState.currentUser) loadNotifications(); }, 400);
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/state.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/components.js"></script>
+  <script src="/js/notifications.js"></script>
 </body>
 </html>
