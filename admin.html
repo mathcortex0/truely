@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
+<body>
+<div id="_nav" data-page="home"></div>
+<div class="page-root"><div class="admin-wrap">
+<h1 style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;margin-bottom:20px">Admin Dashboard</h1>
+
+<!-- STATS -->
+<div class="admin-grid" id="stats-grid">
+  <div class="stat-card"><div class="n" id="s-users">—</div><div class="l">Total Users</div></div>
+  <div class="stat-card"><div class="n" id="s-posts">—</div><div class="l">Total Posts</div></div>
+  <div class="stat-card"><div class="n" id="s-likes">—</div><div class="l">Total Likes</div></div>
+  <div class="stat-card"><div class="n" id="s-reports">—</div><div class="l">Pending Reports</div></div>
+</div>
+
+<!-- ANNOUNCE -->
+<div class="settings-section" style="margin-bottom:20px">
+  <div class="settings-title">Send Announcement</div>
+  <div class="field"><textarea id="ann-text" rows="3" placeholder="Write a system announcement to all users..."></textarea></div>
+  <button class="btn-pri" onclick="sendAnnouncement()">Send to all users</button>
+</div>
+
+<!-- TABS -->
+<div class="tabs" style="background:var(--card);border:1px solid var(--border);border-radius:var(--rad) var(--rad) 0 0;border-bottom:none">
+  <div class="tab on" id="at-users" onclick="switchAdminTab('users')">Users</div>
+  <div class="tab" id="at-posts" onclick="switchAdminTab('posts')">Posts</div>
+  <div class="tab" id="at-reports" onclick="switchAdminTab('reports')">Reports</div>
+</div>
+
+<div style="background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rad) var(--rad);overflow:hidden">
+  <div id="admin-content"><div style="padding:32px;text-align:center"><div class="spinner"></div></div></div>
+</div>
+</div></div>
+<div class="toast" id="_toast"></div>
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent=CSS;
+let adminTab='users';
+
+async function loadStats(){
+  const[{count:uc},{count:pc},{count:lc},{count:rc}]=await Promise.all([
+    sb.from('profiles').select('*',{count:'exact',head:true}),
+    sb.from('posts').select('*',{count:'exact',head:true}),
+    sb.from('likes').select('*',{count:'exact',head:true}),
+    sb.from('reports').select('*',{count:'exact',head:true}).eq('status','pending'),
+  ]);
+  document.getElementById('s-users').textContent=fmt(uc||0);
+  document.getElementById('s-posts').textContent=fmt(pc||0);
+  document.getElementById('s-likes').textContent=fmt(lc||0);
+  document.getElementById('s-reports').textContent=fmt(rc||0);
+}
+
+function switchAdminTab(tab){
+  adminTab=tab;
+  ['users','posts','reports'].forEach(t=>{document.getElementById(`at-${t}`).className='tab'+(t===tab?' on':'');});
+  loadAdminContent();
+}
+
+async function loadAdminContent(){
+  const wrap=document.getElementById('admin-content');
+  wrap.innerHTML=`<div style="padding:32px;text-align:center"><div class="spinner"></div></div>`;
+  if(adminTab==='users')await loadUsers();
+  else if(adminTab==='posts')await loadPosts();
+  else await loadReports();
+}
+
+async function loadUsers(){
+  const{data:users}=await sb.from('profiles').select('*').order('created_at',{ascending:false}).limit(50);
+  const wrap=document.getElementById('admin-content');
+  if(!users||!users.length){wrap.innerHTML='<div class="empty">No users</div>';return;}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="admin-table">
+    <thead><tr><th>User</th><th>Email</th><th>Status</th><th>Posts</th><th>Joined</th><th>Actions</th></tr></thead>
+    <tbody>${users.map(u=>{
+      const isAdmin=Prof.isAdmin(u),isVer=u.is_verified,isBanned=u.is_banned;
+      const badge=isAdmin?'<span class="badge-pill bp-admin">Admin</span>':isVer?'<span class="badge-pill bp-ver">Verified</span>':isBanned?'<span class="badge-pill bp-banned">Banned</span>':'<span class="badge-pill bp-free">Free</span>';
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="av av-xs">${u.avatar_url?`<img src="${u.avatar_url}"/>`:( u.full_name?.charAt(0)||'U')}</div><span style="font-weight:600;font-size:13px">${esc(u.full_name||'User')}</span></div></td>
+        <td style="font-size:13px;color:var(--sub)">${esc(u.email||'')}</td>
+        <td>${badge}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:13px">${fmt(u.post_count||0)}</td>
+        <td style="font-size:12px;color:var(--sub)">${new Date(u.created_at).toLocaleDateString()}</td>
+        <td>
+          ${!isAdmin?`<button class="tbl-act ${isVer?'danger':'cyan'}" onclick="toggleVerify('${u.id}',${isVer})">${isVer?'Unverify':'Verify'}</button>`:''}
+          ${!isAdmin?`<button class="tbl-act ${isBanned?'gold':'danger'}" onclick="toggleBan('${u.id}',${isBanned})">${isBanned?'Unban':'Ban'}</button>`:''}
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+async function loadPosts(){
+  const{data:posts}=await sb.from('posts').select('*').order('created_at',{ascending:false}).limit(50);
+  const wrap=document.getElementById('admin-content');
+  if(!posts||!posts.length){wrap.innerHTML='<div class="empty">No posts</div>';return;}
+  const ids=[...new Set(posts.map(p=>p.author_id))];
+  const{data:profs}=await sb.from('profiles').select('id,full_name').in('id',ids);
+  const pm={};(profs||[]).forEach(p=>pm[p.id]=p);
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="admin-table">
+    <thead><tr><th>Author</th><th>Content</th><th>Likes</th><th>Posted</th><th>Actions</th></tr></thead>
+    <tbody>${posts.map(p=>`<tr>
+      <td style="font-size:13px;font-weight:600">${esc(pm[p.author_id]?.full_name||'Unknown')}</td>
+      <td style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((p.content||'[image]').slice(0,60))}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:13px">${fmt(p.like_count||0)}</td>
+      <td style="font-size:12px;color:var(--sub)">${ago(p.created_at)}</td>
+      <td><button class="tbl-act danger" onclick="adminDelPost(${p.id})">Delete</button></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function loadReports(){
+  const{data:reports}=await sb.from('reports').select('*').eq('status','pending').order('created_at',{ascending:false});
+  const wrap=document.getElementById('admin-content');
+  if(!reports||!reports.length){wrap.innerHTML='<div class="empty" style="padding:32px">No pending reports</div>';return;}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="admin-table">
+    <thead><tr><th>Post ID</th><th>Reason</th><th>Reported</th><th>Actions</th></tr></thead>
+    <tbody>${reports.map(r=>`<tr>
+      <td><a href="/post.html?id=${r.post_id}" style="color:var(--ind);font-family:'DM Mono',monospace">#${r.post_id}</a></td>
+      <td style="font-size:13px">${esc(r.reason)}</td>
+      <td style="font-size:12px;color:var(--sub)">${ago(r.created_at)}</td>
+      <td>
+        <button class="tbl-act danger" onclick="resolveReport(${r.id},'delete',${r.post_id})">Delete post</button>
+        <button class="tbl-act cyan" onclick="resolveReport(${r.id},'dismiss')">Dismiss</button>
+      </td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function toggleVerify(id,isVer){
+  await sb.from('profiles').update({is_verified:!isVer}).eq('id',id);
+  toast(isVer?'Verification removed':'User verified!');loadAdminContent();
+}
+async function toggleBan(id,isBanned){
+  await sb.from('profiles').update({is_banned:!isBanned}).eq('id',id);
+  toast(isBanned?'User unbanned':'User banned');loadAdminContent();
+}
+async function adminDelPost(postId){
+  if(!confirm('Delete this post?'))return;
+  await sb.from('posts').delete().eq('id',postId);
+  toast('Post deleted');loadAdminContent();
+}
+async function resolveReport(reportId,action,postId){
+  if(action==='delete'&&postId){await sb.from('posts').delete().eq('id',postId);}
+  await sb.from('reports').update({status:action==='delete'?'resolved':'dismissed'}).eq('id',reportId);
+  toast(action==='delete'?'Post deleted & report resolved':'Report dismissed');loadAdminContent();loadStats();
+}
+async function sendAnnouncement(){
+  const text=document.getElementById('ann-text').value.trim();
+  if(!text){toast('Write an announcement first','err');return;}
+  const{data:users}=await sb.from('profiles').select('id');
+  if(!users||!users.length){toast('No users found','err');return;}
+  const batch=users.map(u=>({user_id:u.id,from_user_id:T.state.user.id,type:'system',message:text}));
+  await sb.from('notifications').insert(batch);
+  document.getElementById('ann-text').value='';
+  toast(`Announcement sent to ${users.length} users!`);
+}
+
+Auth.init((user)=>{
+  if(!user||!Prof.isAdmin(T.state.profile)){
+    toast('Admin access only','err');
+    setTimeout(()=>location.href='/',1500);
+    return;
+  }
+  loadStats();
+  loadAdminContent();
+});
+</script>
+</body>
+</html>
