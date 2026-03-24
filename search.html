@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Truely — Search</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="shared-css"></style>
+<style>
+.search-head{padding:16px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:56px;z-index:10;}
+.search-wrap{position:relative;}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);}
+.search-box{width:100%;padding:12px 16px 12px 42px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:all 0.2s;}
+.search-box:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--card);}
+.tab{flex:1;padding:12px;text-align:center;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;}
+.tab.active{color:var(--indigo);border-bottom-color:var(--indigo);}
+.user-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--card);transition:background 0.15s;cursor:pointer;animation:fadeIn 0.2s ease;}
+.user-item:hover{background:var(--hover);}
+.user-info{flex:1;}
+.user-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;display:flex;align-items:center;gap:4px;}
+.user-bio{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.post-card{background:var(--card);border-bottom:1px solid var(--border);padding:16px;transition:background 0.15s;animation:fadeIn 0.3s ease;cursor:pointer;}
+.post-card:hover{background:var(--hover);}
+.post-top{display:flex;gap:12px;}
+.post-body{flex:1;}
+.post-user{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.post-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;}
+.post-time{font-size:12px;color:var(--muted);}
+.post-content{font-size:14px;line-height:1.6;margin-top:6px;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+.highlight{background:rgba(79,70,229,0.2);color:var(--indigo);border-radius:3px;padding:0 2px;}
+.empty-state{text-align:center;padding:64px 20px;color:var(--muted);}
+.empty-icon{font-size:48px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div id="nav-placeholder"></div>
+<div class="page-wrap">
+  <div class="wrap">
+    <div class="search-head">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-box" id="search-box" placeholder="Search Truely..." oninput="onSearch()" autofocus/>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" id="tab-people" onclick="switchTab('people')">People</div>
+      <div class="tab" id="tab-posts" onclick="switchTab('posts')">Posts</div>
+    </div>
+    <div id="results">
+      <div class="empty-state"><div class="empty-icon">🔍</div><p>Search for people or posts</p></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/supabase.js"></script>
+<script>
+document.getElementById('shared-css').textContent = SHARED_CSS;
+document.getElementById('nav-placeholder').innerHTML = getNavHTML('search');
+
+let activeTab = 'people';
+let searchTimer = null;
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-people').className = 'tab' + (tab==='people'?' active':'');
+  document.getElementById('tab-posts').className = 'tab' + (tab==='posts'?' active':'');
+  onSearch();
+}
+
+function onSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(doSearch, 300);
+}
+
+async function doSearch() {
+  const q = document.getElementById('search-box').value.trim();
+  const results = document.getElementById('results');
+  if (!q) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>Search for people or posts</p></div>'; return; }
+  results.innerHTML = '<div class="empty-state"><div class="empty-icon" style="animation:spin 1s linear infinite;display:inline-block">⟳</div></div>';
+  if (activeTab === 'people') await searchPeople(q);
+  else await searchPosts(q);
+}
+
+async function searchPeople(q) {
+  const results = document.getElementById('results');
+  const { data: people } = await sb.from('profiles').select('*').ilike('full_name', `%${q}%`).limit(20);
+  if (!people || people.length === 0) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">😕</div><p>No people found</p></div>'; return; }
+  results.innerHTML = people.map(p => {
+    const isAdmin = p.is_admin || p.email === ADMIN_EMAIL;
+    const isVerified = p.is_verified;
+    const badge = isAdmin ? adminBadge() : isVerified ? verifiedBadge() : '';
+    const av = p.avatar_url;
+    const name = p.full_name || 'User';
+    const ring = isAdmin?' admin-ring':isVerified?' verified-ring':'';
+    return `<div class="user-item" onclick="window.location.href='/profile.html?id=${p.id}'">
+      <div class="avatar av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0).toUpperCase()}</div>
+      <div class="user-info">
+        <div class="user-name">${escHtml(name)}${badge}</div>
+        <div class="user-bio">${escHtml(p.bio||p.email||'')}</div>
+      </div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" width="18"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>`;
+  }).join('');
+}
+
+async function searchPosts(q) {
+  const results = document.getElementById('results');
+  const { data: posts } = await sb.from('posts').select('*').ilike('content', `%${q}%`).order('created_at', { ascending: false }).limit(20);
+  if (!posts || posts.length === 0) { results.innerHTML = '<div class="empty-state"><div class="empty-icon">😕</div><p>No posts found</p></div>'; return; }
+  const ids = [...new Set(posts.map(p => p.author_id))];
+  const { data: profiles } = await sb.from('profiles').select('*').in('id', ids);
+  const pm = {}; (profiles||[]).forEach(p => pm[p.id] = p);
+  results.innerHTML = posts.map(p => {
+    const profile = pm[p.author_id];
+    const name = profile?.full_name || 'User';
+    const av = profile?.avatar_url;
+    const isAdmin = profile?.is_admin || profile?.email === ADMIN_EMAIL;
+    const isVerified = profile?.is_verified;
+    const badge = isAdmin ? adminBadge() : isVerified ? verifiedBadge() : '';
+    const ring = isAdmin?' admin-ring':isVerified?' verified-ring':'';
+    // Highlight search term
+    const highlighted = escHtml(p.content).replace(new RegExp(escHtml(q), 'gi'), m => `<span class="highlight">${m}</span>`);
+    return `<div class="post-card" onclick="window.location.href='/profile.html?id=${p.author_id}'">
+      <div class="post-top">
+        <div class="avatar av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0).toUpperCase()}</div>
+        <div class="post-body">
+          <div class="post-user"><span class="post-name">${escHtml(name)}</span>${badge}<span class="post-time">· ${timeAgo(p.created_at)}</span></div>
+          <div class="post-content">${highlighted}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+initSharedAuth(()=>{});
+</script>
+</body>
+</html>
