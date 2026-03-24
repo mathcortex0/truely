@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Settings</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
+<body>
+<div id="_nav" data-page="home"></div>
+<div class="page-root"><div class="settings-wrap">
+<h1 style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;margin-bottom:20px">Settings</h1>
+
+<!-- PROFILE SECTION -->
+<div class="settings-section">
+  <div class="settings-title">Profile</div>
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+    <div class="av av-xl" id="settings-av" style="cursor:pointer" onclick="document.getElementById('av-settings-file').click()">T</div>
+    <div>
+      <div style="font-weight:600;font-size:14px">Profile photo</div>
+      <div style="font-size:13px;color:var(--sub);margin-top:2px">Click photo to change</div>
+    </div>
+    <input type="file" id="av-settings-file" accept="image/*" style="display:none" onchange="updateAv(event)"/>
+  </div>
+  <div class="field"><label>Display Name</label><input id="s-name" type="text" placeholder="Your name"/></div>
+  <div class="field"><label>Bio</label><textarea id="s-bio" rows="3" placeholder="Tell people about yourself..."></textarea></div>
+  <div class="field"><label>Website</label><input id="s-web" type="url" placeholder="https://yoursite.com"/></div>
+  <div class="field"><label>Location</label><input id="s-loc" type="text" placeholder="Where are you?"/></div>
+  <div class="ok-msg" id="prof-ok"></div>
+  <button class="btn-pri" onclick="saveProfile()">Save changes</button>
+</div>
+
+<!-- PASSWORD SECTION -->
+<div class="settings-section">
+  <div class="settings-title">Change Password</div>
+  <div class="field"><label>New Password</label><input id="s-pass" type="password" placeholder="New password (min 6 chars)"/></div>
+  <div class="field"><label>Confirm Password</label><input id="s-pass2" type="password" placeholder="Confirm new password"/></div>
+  <div class="err-msg" id="pass-err"></div>
+  <div class="ok-msg" id="pass-ok"></div>
+  <button class="btn-pri" onclick="changePass()">Update password</button>
+</div>
+
+<!-- VERIFIED SECTION -->
+<div class="settings-section" id="verify-section">
+  <div class="settings-title">Get Verified</div>
+  <p style="font-size:14px;color:var(--sub);margin-bottom:14px">Get a blue verified badge and expanded post limit (600 chars).</p>
+  <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:16px;margin-bottom:14px">
+    <div style="font-size:12px;color:var(--sub);margin-bottom:4px">Pay via Bkash / Nagad to:</div>
+    <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--cyan)">01XXXXXXXXX</div>
+    <div style="font-size:13px;color:var(--sub);margin-top:4px">Amount: <b style="color:var(--text)">৳99 / month</b></div>
+  </div>
+  <p style="font-size:13px;color:var(--sub)">After payment, message the admin and your badge will be activated within 24 hours.</p>
+</div>
+
+<!-- DANGER SECTION -->
+<div class="settings-section">
+  <div class="settings-title" style="color:var(--red)">Danger Zone</div>
+  <p style="font-size:14px;color:var(--sub);margin-bottom:14px">Permanently delete your account and all your data.</p>
+  <button class="btn-danger" onclick="deleteAccount()">Delete Account</button>
+</div>
+</div></div>
+<div class="toast" id="_toast"></div>
+<script src="/truely.js"></script>
+<script>
+document.getElementById('_css').textContent=CSS;
+
+function loadSettings(){
+  const p=T.state.profile;if(!p)return;
+  document.getElementById('s-name').value=p.full_name||'';
+  document.getElementById('s-bio').value=p.bio||'';
+  document.getElementById('s-web').value=p.website||'';
+  document.getElementById('s-loc').value=p.location||'';
+  const av=p.avatar_url,ring=Prof.ring(p);
+  const el=document.getElementById('settings-av');
+  el.innerHTML=av?`<img src="${av}"/>`:(p.full_name||'U').charAt(0).toUpperCase();
+  el.className=`av av-xl${ring}`;
+  // Hide verify section if already verified or admin
+  if(Prof.isAdmin(p)||p.is_verified)document.getElementById('verify-section').style.display='none';
+}
+
+async function saveProfile(){
+  const user=T.state.user;if(!user)return;
+  const name=document.getElementById('s-name').value.trim();
+  const bio=document.getElementById('s-bio').value.trim();
+  const website=document.getElementById('s-web').value.trim();
+  const location=document.getElementById('s-loc').value.trim();
+  if(!name){toast('Name cannot be empty','err');return;}
+  const{error}=await sb.from('profiles').update({full_name:name,bio,website,location}).eq('id',user.id);
+  if(error){toast('Failed to save','err');return;}
+  T.state.profile.full_name=name;T.state.profile.bio=bio;
+  const ok=document.getElementById('prof-ok');ok.textContent='Profile saved!';ok.className='ok-msg show';
+  setTimeout(()=>ok.className='ok-msg',2500);
+  Nav.render();toast('Saved!');
+}
+
+async function changePass(){
+  const p=document.getElementById('s-pass').value,p2=document.getElementById('s-pass2').value;
+  const err=document.getElementById('pass-err'),ok=document.getElementById('pass-ok');
+  err.className='err-msg';ok.className='ok-msg';
+  if(!p){err.textContent='Enter a new password';err.className='err-msg show';return;}
+  if(p.length<6){err.textContent='Password must be 6+ characters';err.className='err-msg show';return;}
+  if(p!==p2){err.textContent='Passwords do not match';err.className='err-msg show';return;}
+  const{error}=await sb.auth.updateUser({password:p});
+  if(error){err.textContent=error.message;err.className='err-msg show';}
+  else{ok.textContent='Password updated!';ok.className='ok-msg show';document.getElementById('s-pass').value='';document.getElementById('s-pass2').value='';}
+}
+
+async function updateAv(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    const url=ev.target.result;
+    await sb.from('profiles').update({avatar_url:url}).eq('id',T.state.user.id);
+    T.state.profile.avatar_url=url;
+    document.getElementById('settings-av').innerHTML=`<img src="${url}"/>`;
+    Nav.render();toast('Photo updated!');
+  };
+  r.readAsDataURL(file);
+}
+
+async function deleteAccount(){
+  if(!confirm('Are you absolutely sure? This cannot be undone.'))return;
+  if(!confirm('All your posts, likes, and data will be permanently deleted.'))return;
+  const user=T.state.user;if(!user)return;
+  await sb.from('posts').delete().eq('author_id',user.id);
+  await sb.from('profiles').delete().eq('id',user.id);
+  await sb.auth.signOut();
+  location.href='/landing.html';
+}
+
+Auth.init((user)=>{
+  if(!user){location.href='/landing.html';return;}
+  loadSettings();
+  if(location.hash==='#verify'){document.getElementById('verify-section').scrollIntoView({behavior:'smooth'});}
+});
+</script>
+</body>
+</html>
