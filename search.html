@@ -1,118 +1,385 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Truely — Search</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style id="_css"></style></head>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="description" content="Truely — Search for people and posts"/>
+<title>Truely — Search</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style id="shared-css"></style>
+<style>
+.search-header {
+  position: sticky;
+  top: 53px;
+  z-index: 80;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+}
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 8px 16px;
+}
+.search-bar svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+.search-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 15px;
+  font-family: var(--font);
+}
+.search-bar input::placeholder {
+  color: var(--text3);
+}
+.search-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.search-tab {
+  flex: 1;
+  padding: 12px 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+.search-tab.active {
+  color: var(--text);
+}
+.search-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--blue);
+  border-radius: 2px;
+}
+.user-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.user-result:hover { background: var(--hover); }
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+.user-name {
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.user-handle {
+  font-size: 13px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.user-bio {
+  font-size: 13px;
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.post-result {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.post-result:hover { background: var(--hover); }
+.post-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.post-result-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.post-result-time {
+  font-size: 12px;
+  color: var(--text3);
+}
+.post-result-content {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.highlight {
+  background: rgba(29,155,240,0.2);
+  color: var(--blue);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.empty-search {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text3);
+}
+.empty-search svg {
+  width: 48px;
+  height: 48px;
+  stroke: var(--text3);
+  stroke-width: 1.5;
+  margin-bottom: 12px;
+}
+.follow-btn-small {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: var(--blue);
+  color: white;
+}
+.follow-btn-small.following {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+</style>
+</head>
 <body>
-<div id="_nav" data-page="search"></div>
-<div class="page-root"><div class="center-wrap" style="border-left:1px solid var(--border);border-right:1px solid var(--border)">
-<div class="search-bar-wrap">
-  <div class="search-bar">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input id="sq" placeholder="Search Truely..." oninput="onSearch()" autofocus/>
+<div id="nav-ph"></div>
+<div id="bn-ph"></div>
+
+<div class="page-wrap">
+  <div class="main-wrap">
+    <div class="search-header">
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search-input" placeholder="Search people or posts..." autofocus oninput="debouncedSearch()">
+      </div>
+    </div>
+    <div class="search-tabs">
+      <button class="search-tab active" id="tab-people" onclick="switchTab('people')">People</button>
+      <button class="search-tab" id="tab-posts" onclick="switchTab('posts')">Posts</button>
+    </div>
+    <div id="results-container">
+      <div class="empty-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <p>Search for people or posts</p>
+      </div>
+    </div>
   </div>
 </div>
-<div class="tabs">
-  <div class="tab on" id="tp" onclick="switchTab('people')">People</div>
-  <div class="tab" id="tt" onclick="switchTab('posts')">Posts</div>
-</div>
-<div id="results"><div class="empty"><div class="empty-icon" style="font-size:32px">🔍</div><p>Search for people or posts</p></div></div>
-</div></div>
-<div class="toast" id="_toast"></div>
-<script src="/truely.js"></script>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/supabase.js"></script>
 <script>
-document.getElementById('_css').textContent=CSS;
-let sTab='people',sTimer=null;
+document.getElementById('shared-css').textContent = SHARED_CSS;
+document.getElementById('nav-ph').innerHTML = getNavHTML('search');
+document.getElementById('bn-ph').innerHTML = getBottomNavHTML('search');
 
-// Pre-fill from URL param
-const qParam=new URLSearchParams(location.search).get('q');
-if(qParam){document.getElementById('sq').value=qParam;}
+let activeTab = 'people';
+let searchTimeout = null;
 
-function switchTab(t){
-  sTab=t;
-  document.getElementById('tp').className='tab'+(t==='people'?' on':'');
-  document.getElementById('tt').className='tab'+(t==='posts'?' on':'');
-  doSearch();
-}
-function onSearch(){clearTimeout(sTimer);sTimer=setTimeout(doSearch,280);}
-
-async function doSearch(){
-  const q=document.getElementById('sq').value.trim();
-  const res=document.getElementById('results');
-  if(!q){res.innerHTML='<div class="empty"><div class="empty-icon" style="font-size:32px">🔍</div><p>Search for people or posts</p></div>';return;}
-  res.innerHTML=`<div style="padding:32px;text-align:center"><div class="spinner"></div></div>`;
-  if(sTab==='people')await searchPeople(q);
-  else await searchPosts(q);
+function debouncedSearch() {
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(performSearch, 300);
 }
 
-async function searchPeople(q){
-  const{data:profs}=await sb.from('profiles').select('*').ilike('full_name',`%${q}%`).limit(20);
-  const res=document.getElementById('results');
-  if(!profs||!profs.length){res.innerHTML='<div class="empty">No people found</div>';return;}
-  const user=T.state.user;
-  let followed=new Set();
-  if(user){const{data:fl}=await sb.from('follows').select('following_id').eq('follower_id',user.id);(fl||[]).forEach(f=>followed.add(f.following_id));}
-  res.innerHTML=profs.map(p=>{
-    const name=p.full_name||'User',av=p.avatar_url;
-    const ring=Prof.ring(p),badge=Prof.badge(p);
-    const isFollowing=followed.has(p.id),isMe=user?.id===p.id;
-    return `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="location.href='/profile.html?id=${p.id}'" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">
-      <div class="av av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:3px">${esc(name)}${badge}</div>
-        <div style="font-size:12px;color:var(--sub)">${fmt(p.follower_count||0)} followers${p.bio?` · ${esc(p.bio.slice(0,40))}`:''}</div>
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-people').className = 'search-tab' + (tab === 'people' ? ' active' : '');
+  document.getElementById('tab-posts').className = 'search-tab' + (tab === 'posts' ? ' active' : '');
+  performSearch();
+}
+
+async function performSearch() {
+  const query = document.getElementById('search-input').value.trim();
+  const container = document.getElementById('results-container');
+
+  if (!query) {
+    container.innerHTML = `
+      <div class="empty-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <p>Search for people or posts</p>
       </div>
-      ${user&&!isMe?`<button class="follow-pill${isFollowing?' on':''}" id="sfp-${p.id}" onclick="event.stopPropagation();srFollow('${p.id}',${isFollowing})">${isFollowing?'Following':'Follow'}</button>`:''}
-      <svg viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2" width="16"><polyline points="9 18 15 12 9 6"/></svg>
-    </div>`;
-  }).join('');
-}
-
-async function searchPosts(q){
-  const isHash=q.startsWith('#');
-  const res=document.getElementById('results');
-  let posts;
-  if(isHash){
-    const tag=q.slice(1).toLowerCase();
-    const{data:ht}=await sb.from('hashtags').select('post_id').eq('tag',tag).limit(20);
-    if(!ht||!ht.length){res.innerHTML='<div class="empty">No posts with that hashtag</div>';return;}
-    const ids=ht.map(h=>h.post_id);
-    const{data}=await sb.from('posts').select('*').in('id',ids).order('created_at',{ascending:false});
-    posts=data;
-  } else {
-    const{data}=await sb.from('posts').select('*').ilike('content',`%${q}%`).order('created_at',{ascending:false}).limit(20);
-    posts=data;
+    `;
+    return;
   }
-  if(!posts||!posts.length){res.innerHTML='<div class="empty">No posts found</div>';return;}
-  const ids=[...new Set(posts.map(p=>p.author_id))];
-  const{data:profs}=await sb.from('profiles').select('*').in('id',ids);
-  const pm={};(profs||[]).forEach(p=>pm[p.id]=p);
-  res.innerHTML=posts.map((p,i)=>{
-    const prof=pm[p.author_id],name=prof?.full_name||'User',av=prof?.avatar_url;
-    const ring=Prof.ring(prof),badge=Prof.badge(prof);
-    const hi=esc(p.content||'').replace(new RegExp(esc(q),'gi'),m=>`<span style="background:rgba(79,70,229,.2);color:var(--ind);border-radius:3px;padding:0 2px">${m}</span>`);
-    return `<div class="post" style="animation-delay:${i*30}ms" onclick="location.href='/post.html?id=${p.id}'">
-      <div class="post-row">
-        <div class="av av-md${ring}">${av?`<img src="${av}"/>`:name.charAt(0)}</div>
-        <div class="post-body">
-          <div class="post-meta"><span class="post-name" onclick="event.stopPropagation();location.href='/profile.html?id=${p.author_id}'">${esc(name)}</span>${badge}<span class="post-dot">·</span><span class="post-time">${ago(p.created_at)}</span></div>
-          <div class="post-text">${hi}</div>
-          <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--sub);margin-top:6px">${fmt(p.like_count||0)} likes · ${fmt(p.comment_count||0)} replies</div>
-        </div>
+
+  container.innerHTML = '<div style="padding: 32px; text-align: center;"><div class="skeleton" style="height: 70px; margin-bottom: 8px;"></div><div class="skeleton" style="height: 70px;"></div></div>';
+
+  if (activeTab === 'people') {
+    await searchPeople(query);
+  } else {
+    await searchPosts(query);
+  }
+}
+
+async function searchPeople(query) {
+  const { data: users } = await sb
+    .from('profiles')
+    .select('*')
+    .ilike('full_name', `%${query}%`)
+    .limit(20);
+
+  const container = document.getElementById('results-container');
+
+  if (!users || users.length === 0) {
+    container.innerHTML = `
+      <div class="empty-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <p>No people found for "${escapeHtml(query)}"</p>
       </div>
-    </div>`;
+    `;
+    return;
+  }
+
+  const currentUser = window.TruelyState.currentUser;
+  let followingIds = new Set();
+  if (currentUser) {
+    const { data: follows } = await sb.from('follows').select('following_id').eq('follower_id', currentUser.id);
+    followingIds = new Set((follows || []).map(f => f.following_id));
+  }
+
+  container.innerHTML = users.map(user => {
+    const isAdmin = user.is_admin || user.email === ADMIN_EMAIL;
+    const isVerified = user.is_verified;
+    const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+    let badgeHtml = '';
+    if (isAdmin) badgeHtml = adminBadge();
+    else if (isVerified) badgeHtml = verifiedBadge();
+    const avHTML = user.avatar_url ? `<img src="${user.avatar_url}">` : `<span>${(user.full_name || 'U')[0].toUpperCase()}</span>`;
+    const isFollowing = followingIds.has(user.id);
+    const isSelf = currentUser?.id === user.id;
+
+    return `
+      <div class="user-result" onclick="window.location.href='/profile.html?id=${user.id}'">
+        <div class="avatar av-md ${ring}">${avHTML}</div>
+        <div class="user-info">
+          <div class="user-name">${escapeHtml(user.full_name || 'User')}${badgeHtml}</div>
+          <div class="user-handle">@${escapeHtml(user.username || user.full_name?.toLowerCase().replace(/\s/g, '_') || 'user')}</div>
+          ${user.bio ? `<div class="user-bio">${escapeHtml(user.bio.slice(0, 60))}${user.bio.length > 60 ? '...' : ''}</div>` : ''}
+        </div>
+        ${!isSelf && currentUser ? `
+          <button class="follow-btn-small ${isFollowing ? 'following' : ''}" onclick="event.stopPropagation(); quickFollow('${user.id}', ${isFollowing})">
+            ${isFollowing ? 'Following' : 'Follow'}
+          </button>
+        ` : ''}
+      </div>
+    `;
   }).join('');
 }
 
-async function srFollow(id,following){
-  const user=T.state.user;if(!user){location.href='/landing.html';return;}
-  const btn=document.getElementById(`sfp-${id}`);
-  if(following){await sb.from('follows').delete().eq('follower_id',user.id).eq('following_id',id);btn.textContent='Follow';btn.className='follow-pill';}
-  else{await sb.from('follows').insert({follower_id:user.id,following_id:id});btn.textContent='Following';btn.className='follow-pill on';toast('Following!');}
-  btn.setAttribute('onclick',`event.stopPropagation();srFollow('${id}',${!following})`);
+async function searchPosts(query) {
+  const { data: posts } = await sb
+    .from('posts')
+    .select(`*, profiles!posts_author_id_fkey(id, full_name, avatar_url, is_verified, is_admin, email)`)
+    .ilike('content', `%${query}%`)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const container = document.getElementById('results-container');
+
+  if (!posts || posts.length === 0) {
+    container.innerHTML = `
+      <div class="empty-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <p>No posts found for "${escapeHtml(query)}"</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Highlight the search term
+  const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+
+  container.innerHTML = posts.map(post => {
+    const profile = post.profiles;
+    const name = profile?.full_name || 'User';
+    const isAdmin = profile?.is_admin || profile?.email === ADMIN_EMAIL;
+    const isVerified = profile?.is_verified;
+    const ring = isAdmin ? 'admin-ring' : isVerified ? 'verified-ring' : '';
+    let badgeHtml = '';
+    if (isAdmin) badgeHtml = adminBadge();
+    else if (isVerified) badgeHtml = verifiedBadge(14);
+    const avHTML = profile?.avatar_url ? `<img src="${profile.avatar_url}">` : `<span>${(name[0] || 'U').toUpperCase()}</span>`;
+    const highlightedContent = escapeHtml(post.content || '').replace(regex, '<span class="highlight">$1</span>');
+
+    return `
+      <div class="post-result" onclick="window.location.href='/post.html?id=${post.id}'">
+        <div class="post-result-header">
+          <div class="avatar av-xs ${ring}">${avHTML}</div>
+          <span class="post-result-name">${escapeHtml(name)}${badgeHtml}</span>
+          <span class="post-result-time">· ${timeAgo(post.created_at)}</span>
+        </div>
+        <div class="post-result-content">${highlightedContent}</div>
+      </div>
+    `;
+  }).join('');
 }
 
-Auth.init(()=>{if(qParam)doSearch();});
-if(qParam)setTimeout(doSearch,500);
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function quickFollow(userId, isFollowing) {
+  const user = window.TruelyState.currentUser;
+  if (!user) {
+    toast('Sign in to follow', 'error');
+    return;
+  }
+
+  const btn = event.currentTarget;
+  if (isFollowing) {
+    await sb.from('follows').delete().eq('follower_id', user.id).eq('following_id', userId);
+    btn.textContent = 'Follow';
+    btn.classList.remove('following');
+    toast('Unfollowed');
+  } else {
+    await sb.from('follows').insert({ follower_id: user.id, following_id: userId });
+    btn.textContent = 'Following';
+    btn.classList.add('following');
+    await sb.from('notifications').insert({ user_id: userId, from_user_id: user.id, type: 'follow' });
+    toast('Following');
+  }
+}
+
+// Pre-fill from URL
+const urlParams = new URLSearchParams(window.location.search);
+const qParam = urlParams.get('q');
+if (qParam) {
+  document.getElementById('search-input').value = qParam;
+  setTimeout(performSearch, 200);
+}
+
+initSharedAuth(() => {
+  if (qParam) performSearch();
+});
 </script>
 </body>
 </html>
